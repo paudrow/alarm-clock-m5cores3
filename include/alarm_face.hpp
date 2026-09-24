@@ -36,6 +36,8 @@ enum class TimeFormat {
   HoursMinutesSeconds,
 };
 
+enum class HourCycle { H24, H12 };
+
 struct Inputs {
   Hm now;
   int second;
@@ -144,18 +146,18 @@ enum class ClockHit {
   Skip,
 };
 
-enum class MenuHit { None, Back, Alarm, Sound, ClockFace, Display };
+enum class MenuHit { None, Back, Alarm, Sound, Day, Night };
 
 enum class ColorMode { Auto, Day, Night };
 
-enum class DisplayPageHit {
+enum class DayPageHit { None, Back, BrightDown, BrightUp, Face, Hour };
+
+enum class NightPageHit { None, Back, BrightDown, BrightUp, Face, Hour, When };
+
+enum class WhenPageHit {
   None,
   Back,
   Mode,
-  DayDown,
-  DayUp,
-  NightDown,
-  NightUp,
   StartDown,
   StartUp,
   EndDown,
@@ -185,9 +187,31 @@ enum class SoundPageHit {
   PreviewLoud,
 };
 
-enum class ClockPageHit { None, Back, DayFormat, NightFormat };
-
 enum class RingHit { None, Snooze, Stop };
+
+inline const char* color_mode_label(ColorMode mode) {
+  switch (mode) {
+    case ColorMode::Day:
+      return "Always day";
+    case ColorMode::Night:
+      return "Always night";
+    case ColorMode::Auto:
+      return "Follow clock";
+  }
+  return "Follow clock";
+}
+
+inline ColorMode next_color_mode(ColorMode mode) {
+  switch (mode) {
+    case ColorMode::Auto:
+      return ColorMode::Day;
+    case ColorMode::Day:
+      return ColorMode::Night;
+    case ColorMode::Night:
+      return ColorMode::Auto;
+  }
+  return ColorMode::Auto;
+}
 
 inline Hm step_minutes(Hm t, int delta);
 
@@ -276,6 +300,14 @@ inline TimeFormat next_format(TimeFormat fmt) {
   return TimeFormat::HoursMinutesSeconds;
 }
 
+inline HourCycle next_hour_cycle(HourCycle cycle) {
+  return cycle == HourCycle::H12 ? HourCycle::H24 : HourCycle::H12;
+}
+
+inline const char* hour_cycle_label(HourCycle cycle) {
+  return cycle == HourCycle::H12 ? "AM/PM" : "24 hour";
+}
+
 inline const char* format_label(TimeFormat fmt) {
   switch (fmt) {
     case TimeFormat::Hidden:
@@ -333,9 +365,46 @@ inline int speaker_level(int volume_percent) {
   return v * 255 / 100;
 }
 
+inline int clock_hour(int hour, HourCycle cycle) {
+  if (cycle == HourCycle::H24) {
+    return hour;
+  }
+  int h = hour % 12;
+  if (h < 0) {
+    h += 12;
+  }
+  return h == 0 ? 12 : h;
+}
+
+inline const char* day_period(int hour) { return hour < 12 ? "AM" : "PM"; }
+
 inline void format_time(char* buf, size_t n, TimeFormat fmt, int hour,
-                        int minute, int second) {
+                        int minute, int second,
+                        HourCycle cycle = HourCycle::H24) {
   if (n == 0) {
+    return;
+  }
+  if (fmt == TimeFormat::Hidden) {
+    buf[0] = '\0';
+    return;
+  }
+  if (cycle == HourCycle::H12) {
+    const int h = clock_hour(hour, cycle);
+    const char* period = day_period(hour);
+    switch (fmt) {
+      case TimeFormat::Hours:
+        std::snprintf(buf, n, "%d %s", h, period);
+        return;
+      case TimeFormat::HoursMinutes:
+        std::snprintf(buf, n, "%d:%02d %s", h, minute, period);
+        return;
+      case TimeFormat::HoursMinutesSeconds:
+        std::snprintf(buf, n, "%d:%02d:%02d %s", h, minute, second, period);
+        return;
+      case TimeFormat::Hidden:
+        break;
+    }
+    buf[0] = '\0';
     return;
   }
   switch (fmt) {
@@ -353,6 +422,39 @@ inline void format_time(char* buf, size_t n, TimeFormat fmt, int hour,
       return;
   }
   buf[0] = '\0';
+}
+
+inline void format_clock_face(char* digits, size_t nd, char* period, size_t np,
+                              TimeFormat fmt, int hour, int minute, int second,
+                              HourCycle cycle) {
+  if (nd == 0 || np == 0) {
+    return;
+  }
+  period[0] = '\0';
+  if (fmt == TimeFormat::Hidden) {
+    digits[0] = '\0';
+    return;
+  }
+  if (cycle == HourCycle::H24) {
+    format_time(digits, nd, fmt, hour, minute, second, HourCycle::H24);
+    return;
+  }
+  const int h = clock_hour(hour, cycle);
+  std::snprintf(period, np, "%s", day_period(hour));
+  switch (fmt) {
+    case TimeFormat::Hours:
+      std::snprintf(digits, nd, "%d", h);
+      return;
+    case TimeFormat::HoursMinutes:
+      std::snprintf(digits, nd, "%d:%02d", h, minute);
+      return;
+    case TimeFormat::HoursMinutesSeconds:
+      std::snprintf(digits, nd, "%d:%02d:%02d", h, minute, second);
+      return;
+    case TimeFormat::Hidden:
+      break;
+  }
+  digits[0] = '\0';
 }
 
 inline bool preview_playing(uint32_t elapsed_ms) { return elapsed_ms < 2000; }
@@ -382,10 +484,24 @@ inline Hm step_minutes(Hm t, int delta) {
   return Hm{m / 60, m % 60};
 }
 
+inline int snap_brightness(int value) {
+  if (value < 10) {
+    return 10;
+  }
+  if (value > 100) {
+    return 100;
+  }
+  int snapped = ((value + 5) / 10) * 10;
+  if (snapped > 100) {
+    return 100;
+  }
+  return snapped;
+}
+
 inline int adjust_brightness(int value, int delta) {
-  int v = value + delta;
-  if (v < 5) {
-    return 5;
+  int v = snap_brightness(value) + delta;
+  if (v < 10) {
+    return 10;
   }
   if (v > 100) {
     return 100;
@@ -394,13 +510,8 @@ inline int adjust_brightness(int value, int delta) {
 }
 
 inline int backlight_level(int percent) {
-  if (percent < 5) {
-    percent = 5;
-  }
-  if (percent > 100) {
-    percent = 100;
-  }
-  return percent * 255 / 100;
+  percent = snap_brightness(percent);
+  return 1 + (percent - 10) * 254 / 90;
 }
 
 inline ClockHit clock_hit(int x, int y, int w, int h) {
@@ -435,10 +546,10 @@ inline MenuHit menu_hit(int x, int y, int w, int h) {
     return MenuHit::Sound;
   }
   if (in_box(centered_button(3, 5, w, h, 180), x, y)) {
-    return MenuHit::ClockFace;
+    return MenuHit::Day;
   }
   if (in_box(centered_button(4, 5, w, h, 180), x, y)) {
-    return MenuHit::Display;
+    return MenuHit::Night;
   }
   return MenuHit::None;
 }
@@ -468,50 +579,106 @@ inline SoundPageHit sound_page_hit(int x, int y, int w, int h) {
   if (!in_bounds(x, y, w, h)) {
     return SoundPageHit::None;
   }
-  if (in_box(back_button(6, w, h), x, y)) {
+  if (in_box(back_button(5, w, h), x, y)) {
     return SoundPageHit::Back;
   }
-  if (in_box(side_button(1, 6, w, h, false), x, y)) {
+  if (in_box(side_button(1, 5, w, h, false), x, y)) {
     return SoundPageHit::VolumeDown;
   }
-  if (in_box(side_button(1, 6, w, h, true), x, y)) {
+  if (in_box(side_button(1, 5, w, h, true), x, y)) {
     return SoundPageHit::VolumeUp;
   }
-  if (in_box(side_button(2, 6, w, h, false), x, y)) {
+  if (in_box(side_button(2, 5, w, h, false), x, y)) {
     return SoundPageHit::SoftDown;
   }
-  if (in_box(side_button(2, 6, w, h, true), x, y)) {
+  if (in_box(side_button(2, 5, w, h, true), x, y)) {
     return SoundPageHit::SoftUp;
   }
-  if (in_box(side_button(3, 6, w, h, false), x, y)) {
+  if (in_box(side_button(3, 5, w, h, false), x, y)) {
     return SoundPageHit::GentleDown;
   }
-  if (in_box(side_button(3, 6, w, h, true), x, y)) {
+  if (in_box(side_button(3, 5, w, h, true), x, y)) {
     return SoundPageHit::GentleUp;
   }
-  if (in_box(centered_button(4, 6, w, h, 200), x, y)) {
+  if (in_box(column_button(4, 5, 0, 2, w, h), x, y)) {
     return SoundPageHit::PreviewSoft;
   }
-  if (in_box(centered_button(5, 6, w, h, 200), x, y)) {
+  if (in_box(column_button(4, 5, 1, 2, w, h), x, y)) {
     return SoundPageHit::PreviewLoud;
   }
   return SoundPageHit::None;
 }
 
-inline ClockPageHit clock_page_hit(int x, int y, int w, int h) {
+inline DayPageHit day_page_hit(int x, int y, int w, int h) {
   if (!in_bounds(x, y, w, h)) {
-    return ClockPageHit::None;
+    return DayPageHit::None;
   }
-  if (in_box(back_button(3, w, h), x, y)) {
-    return ClockPageHit::Back;
+  if (in_box(back_button(4, w, h), x, y)) {
+    return DayPageHit::Back;
   }
-  if (in_box(centered_button(1, 3, w, h, 220), x, y)) {
-    return ClockPageHit::DayFormat;
+  if (in_box(side_button(1, 4, w, h, false), x, y)) {
+    return DayPageHit::BrightDown;
   }
-  if (in_box(centered_button(2, 3, w, h, 220), x, y)) {
-    return ClockPageHit::NightFormat;
+  if (in_box(side_button(1, 4, w, h, true), x, y)) {
+    return DayPageHit::BrightUp;
   }
-  return ClockPageHit::None;
+  if (in_box(centered_button(2, 4, w, h, 220), x, y)) {
+    return DayPageHit::Face;
+  }
+  if (in_box(centered_button(3, 4, w, h, 220), x, y)) {
+    return DayPageHit::Hour;
+  }
+  return DayPageHit::None;
+}
+
+inline NightPageHit night_page_hit(int x, int y, int w, int h) {
+  if (!in_bounds(x, y, w, h)) {
+    return NightPageHit::None;
+  }
+  if (in_box(back_button(5, w, h), x, y)) {
+    return NightPageHit::Back;
+  }
+  if (in_box(side_button(1, 5, w, h, false), x, y)) {
+    return NightPageHit::BrightDown;
+  }
+  if (in_box(side_button(1, 5, w, h, true), x, y)) {
+    return NightPageHit::BrightUp;
+  }
+  if (in_box(centered_button(2, 5, w, h, 220), x, y)) {
+    return NightPageHit::Face;
+  }
+  if (in_box(centered_button(3, 5, w, h, 220), x, y)) {
+    return NightPageHit::Hour;
+  }
+  if (in_box(centered_button(4, 5, w, h, 220), x, y)) {
+    return NightPageHit::When;
+  }
+  return NightPageHit::None;
+}
+
+inline WhenPageHit when_page_hit(int x, int y, int w, int h) {
+  if (!in_bounds(x, y, w, h)) {
+    return WhenPageHit::None;
+  }
+  if (in_box(back_button(4, w, h), x, y)) {
+    return WhenPageHit::Back;
+  }
+  if (in_box(centered_button(1, 4, w, h, 220), x, y)) {
+    return WhenPageHit::Mode;
+  }
+  if (in_box(side_button(2, 4, w, h, false), x, y)) {
+    return WhenPageHit::StartDown;
+  }
+  if (in_box(side_button(2, 4, w, h, true), x, y)) {
+    return WhenPageHit::StartUp;
+  }
+  if (in_box(side_button(3, 4, w, h, false), x, y)) {
+    return WhenPageHit::EndDown;
+  }
+  if (in_box(side_button(3, 4, w, h, true), x, y)) {
+    return WhenPageHit::EndUp;
+  }
+  return WhenPageHit::None;
 }
 
 inline Box ring_action_box(int screen_w, int screen_h, bool stop) {
@@ -533,43 +700,6 @@ inline RingHit ring_hit(int x, int y, int w, int h) {
     return RingHit::Stop;
   }
   return RingHit::None;
-}
-
-inline DisplayPageHit display_page_hit(int x, int y, int w, int h) {
-  if (!in_bounds(x, y, w, h)) {
-    return DisplayPageHit::None;
-  }
-  if (in_box(back_button(6, w, h), x, y)) {
-    return DisplayPageHit::Back;
-  }
-  if (in_box(centered_button(1, 6, w, h, 200), x, y)) {
-    return DisplayPageHit::Mode;
-  }
-  if (in_box(side_button(2, 6, w, h, false), x, y)) {
-    return DisplayPageHit::DayDown;
-  }
-  if (in_box(side_button(2, 6, w, h, true), x, y)) {
-    return DisplayPageHit::DayUp;
-  }
-  if (in_box(side_button(3, 6, w, h, false), x, y)) {
-    return DisplayPageHit::NightDown;
-  }
-  if (in_box(side_button(3, 6, w, h, true), x, y)) {
-    return DisplayPageHit::NightUp;
-  }
-  if (in_box(side_button(4, 6, w, h, false), x, y)) {
-    return DisplayPageHit::StartDown;
-  }
-  if (in_box(side_button(4, 6, w, h, true), x, y)) {
-    return DisplayPageHit::StartUp;
-  }
-  if (in_box(side_button(5, 6, w, h, false), x, y)) {
-    return DisplayPageHit::EndDown;
-  }
-  if (in_box(side_button(5, 6, w, h, true), x, y)) {
-    return DisplayPageHit::EndUp;
-  }
-  return DisplayPageHit::None;
 }
 
 inline Alarm apply_zone(Alarm alarm, Zone zone) {
@@ -662,6 +792,7 @@ struct Settings {
   uint8_t night_end_minute;
   uint8_t day_bright;
   uint8_t night_bright;
+  uint8_t hour12;
 };
 
 inline bool settings_valid(const Settings& s) {
@@ -688,7 +819,12 @@ inline bool settings_valid(const Settings& s) {
       s.night_bright > 100) {
     return false;
   }
+  if (s.hour12 > 1) {
+    return false;
+  }
   return true;
 }
+
+static_assert(sizeof(Settings) == 24, "settings blob stays one NVS record");
 
 #endif

@@ -234,6 +234,31 @@ int main() {
           "format_time HoursMinutesSeconds 9, 5, 7 -> \"09:05:07\"");
   }
   {
+    char buf[16];
+    format_time(buf, sizeof(buf), TimeFormat::HoursMinutesSeconds, 0, 5, 7,
+                HourCycle::H12);
+    check(std::strcmp(buf, "12:05:07 AM") == 0, "format_time midnight AM");
+    format_time(buf, sizeof(buf), TimeFormat::HoursMinutes, 12, 0, 0,
+                HourCycle::H12);
+    check(std::strcmp(buf, "12:00 PM") == 0, "format_time noon PM");
+    format_time(buf, sizeof(buf), TimeFormat::Hours, 15, 0, 0, HourCycle::H12);
+    check(std::strcmp(buf, "3 PM") == 0, "format_time 15 -> 3 PM");
+    format_time(buf, sizeof(buf), TimeFormat::Hidden, 15, 0, 0, HourCycle::H12);
+    check(std::strcmp(buf, "") == 0, "format_time hidden stays blank");
+    char digits[16];
+    char period[4];
+    format_clock_face(digits, sizeof(digits), period, sizeof(period),
+                      TimeFormat::HoursMinutesSeconds, 15, 5, 7, HourCycle::H12);
+    check(std::strcmp(digits, "3:05:07") == 0 && std::strcmp(period, "PM") == 0,
+          "format_clock_face splits PM");
+    format_clock_face(digits, sizeof(digits), period, sizeof(period),
+                      TimeFormat::HoursMinutes, 9, 5, 0, HourCycle::H24);
+    check(std::strcmp(digits, "09:05") == 0 && period[0] == '\0',
+          "format_clock_face 24h has no period");
+    check(next_hour_cycle(HourCycle::H24) == HourCycle::H12, "next hour 12");
+    check(next_hour_cycle(HourCycle::H12) == HourCycle::H24, "next hour 24");
+  }
+  {
     check(preview_playing(0), "preview_playing(0) true");
     check(preview_playing(1999), "preview_playing(1999) true");
     check(!preview_playing(2000), "preview_playing(2000) false");
@@ -261,10 +286,9 @@ int main() {
     check(menu_hit(20, 90, w, h) == MenuHit::None, "menu_hit (20, 90) None");
     check(menu_hit(160, 120, w, h) == MenuHit::Sound,
           "menu_hit (160, 120) Sound");
-    check(menu_hit(160, 168, w, h) == MenuHit::ClockFace,
-          "menu_hit (160, 168) ClockFace");
-    check(menu_hit(160, 216, w, h) == MenuHit::Display,
-          "menu_hit (160, 216) Display");
+    check(menu_hit(160, 168, w, h) == MenuHit::Day, "menu_hit (160, 168) Day");
+    check(menu_hit(160, 216, w, h) == MenuHit::Night,
+          "menu_hit (160, 216) Night");
   }
   {
     const int w = 320;
@@ -285,44 +309,88 @@ int main() {
   {
     const int w = 320;
     const int h = 240;
-    check(sound_page_hit(20, 18, w, h) == SoundPageHit::Back,
-          "sound_page_hit (20, 18) Back");
-    check(sound_page_hit(20, 35, w, h) == SoundPageHit::None,
-          "sound_page_hit (20, 35) None");
-    check(sound_page_hit(20, 58, w, h) == SoundPageHit::VolumeDown,
-          "sound_page_hit (20, 58) VolumeDown");
-    check(sound_page_hit(160, 58, w, h) == SoundPageHit::None,
-          "sound_page_hit (160, 58) None");
-    check(sound_page_hit(300, 58, w, h) == SoundPageHit::VolumeUp,
-          "sound_page_hit (300, 58) VolumeUp");
-    check(sound_page_hit(20, 98, w, h) == SoundPageHit::SoftDown,
-          "sound_page_hit (20, 98) SoftDown");
-    check(sound_page_hit(300, 98, w, h) == SoundPageHit::SoftUp,
-          "sound_page_hit (300, 98) SoftUp");
-    check(sound_page_hit(20, 140, w, h) == SoundPageHit::GentleDown,
-          "sound_page_hit (20, 140) GentleDown");
-    check(sound_page_hit(300, 140, w, h) == SoundPageHit::GentleUp,
-          "sound_page_hit (300, 140) GentleUp");
-    check(sound_page_hit(160, 180, w, h) == SoundPageHit::PreviewSoft,
-          "sound_page_hit (160, 180) PreviewSoft");
-    check(sound_page_hit(160, 218, w, h) == SoundPageHit::PreviewLoud,
-          "sound_page_hit (160, 218) PreviewLoud");
-    check(sound_page_hit(20, 75, w, h) == SoundPageHit::None,
-          "sound_page_hit (20, 75) None");
+    check(sound_page_hit(20, 24, w, h) == SoundPageHit::Back,
+          "sound_page_hit (20, 24) Back");
+    check(sound_page_hit(20, 45, w, h) == SoundPageHit::None,
+          "sound_page_hit (20, 45) None");
+    check(sound_page_hit(20, 72, w, h) == SoundPageHit::VolumeDown,
+          "sound_page_hit (20, 72) VolumeDown");
+    check(sound_page_hit(160, 72, w, h) == SoundPageHit::None,
+          "sound_page_hit (160, 72) None");
+    check(sound_page_hit(300, 72, w, h) == SoundPageHit::VolumeUp,
+          "sound_page_hit (300, 72) VolumeUp");
+    check(sound_page_hit(20, 120, w, h) == SoundPageHit::SoftDown,
+          "sound_page_hit (20, 120) SoftDown");
+    check(sound_page_hit(300, 120, w, h) == SoundPageHit::SoftUp,
+          "sound_page_hit (300, 120) SoftUp");
+    check(sound_page_hit(20, 168, w, h) == SoundPageHit::GentleDown,
+          "sound_page_hit (20, 168) GentleDown");
+    check(sound_page_hit(300, 168, w, h) == SoundPageHit::GentleUp,
+          "sound_page_hit (300, 168) GentleUp");
+    check(sound_page_hit(40, 216, w, h) == SoundPageHit::PreviewSoft,
+          "sound_page_hit (40, 216) PreviewSoft");
+    check(sound_page_hit(160, 216, w, h) == SoundPageHit::None,
+          "sound_page_hit (160, 216) None");
+    check(sound_page_hit(200, 216, w, h) == SoundPageHit::PreviewLoud,
+          "sound_page_hit (200, 216) PreviewLoud");
   }
   {
     const int w = 320;
     const int h = 240;
-    check(clock_page_hit(20, 40, w, h) == ClockPageHit::Back,
-          "clock_page_hit (20, 40) Back");
-    check(clock_page_hit(200, 40, w, h) == ClockPageHit::None,
-          "clock_page_hit (200, 40) None");
-    check(clock_page_hit(20, 80, w, h) == ClockPageHit::None,
-          "clock_page_hit (20, 80) None");
-    check(clock_page_hit(160, 120, w, h) == ClockPageHit::DayFormat,
-          "clock_page_hit (160, 120) DayFormat");
-    check(clock_page_hit(160, 200, w, h) == ClockPageHit::NightFormat,
-          "clock_page_hit (160, 200) NightFormat");
+    check(day_page_hit(20, 40, w, h) == DayPageHit::Back,
+          "day_page_hit (20, 40) Back");
+    check(day_page_hit(160, 40, w, h) == DayPageHit::None,
+          "day_page_hit (160, 40) None");
+    check(day_page_hit(20, 60, w, h) == DayPageHit::None,
+          "day_page_hit (20, 60) None");
+    check(day_page_hit(20, 90, w, h) == DayPageHit::BrightDown,
+          "day_page_hit (20, 90) BrightDown");
+    check(day_page_hit(160, 90, w, h) == DayPageHit::None,
+          "day_page_hit (160, 90) None");
+    check(day_page_hit(300, 90, w, h) == DayPageHit::BrightUp,
+          "day_page_hit (300, 90) BrightUp");
+    check(day_page_hit(160, 150, w, h) == DayPageHit::Face,
+          "day_page_hit (160, 150) Face");
+    check(day_page_hit(160, 210, w, h) == DayPageHit::Hour,
+          "day_page_hit (160, 210) Hour");
+  }
+  {
+    const int w = 320;
+    const int h = 240;
+    check(night_page_hit(20, 24, w, h) == NightPageHit::Back,
+          "night_page_hit (20, 24) Back");
+    check(night_page_hit(20, 72, w, h) == NightPageHit::BrightDown,
+          "night_page_hit (20, 72) BrightDown");
+    check(night_page_hit(160, 72, w, h) == NightPageHit::None,
+          "night_page_hit (160, 72) None");
+    check(night_page_hit(300, 72, w, h) == NightPageHit::BrightUp,
+          "night_page_hit (300, 72) BrightUp");
+    check(night_page_hit(160, 120, w, h) == NightPageHit::Face,
+          "night_page_hit (160, 120) Face");
+    check(night_page_hit(160, 168, w, h) == NightPageHit::Hour,
+          "night_page_hit (160, 168) Hour");
+    check(night_page_hit(160, 216, w, h) == NightPageHit::When,
+          "night_page_hit (160, 216) When");
+    check(night_page_hit(20, 50, w, h) == NightPageHit::None,
+          "night_page_hit (20, 50) None");
+  }
+  {
+    const int w = 320;
+    const int h = 240;
+    check(when_page_hit(20, 30, w, h) == WhenPageHit::Back,
+          "when_page_hit (20, 30) Back");
+    check(when_page_hit(160, 90, w, h) == WhenPageHit::Mode,
+          "when_page_hit (160, 90) Mode");
+    check(when_page_hit(20, 150, w, h) == WhenPageHit::StartDown,
+          "when_page_hit (20, 150) StartDown");
+    check(when_page_hit(160, 150, w, h) == WhenPageHit::None,
+          "when_page_hit (160, 150) None");
+    check(when_page_hit(300, 150, w, h) == WhenPageHit::StartUp,
+          "when_page_hit (300, 150) StartUp");
+    check(when_page_hit(20, 210, w, h) == WhenPageHit::EndDown,
+          "when_page_hit (20, 210) EndDown");
+    check(when_page_hit(300, 210, w, h) == WhenPageHit::EndUp,
+          "when_page_hit (300, 210) EndUp");
   }
   {
     check(next_format(TimeFormat::Hidden) == TimeFormat::Hours,
@@ -425,37 +493,21 @@ int main() {
   }
   {
     check(adjust_brightness(20, -10) == 10, "adjust_brightness 20-10");
-    check(adjust_brightness(5, -10) == 5, "adjust_brightness floor 5");
+    check(adjust_brightness(10, -10) == 10, "adjust_brightness floor 10");
+    check(adjust_brightness(15, 10) == 30, "adjust_brightness snaps then steps 10");
     check(adjust_brightness(100, 10) == 100, "adjust_brightness ceiling 100");
+    check(snap_brightness(5) == 10, "snap_brightness 5");
+    check(snap_brightness(15) == 20, "snap_brightness 15");
     check(backlight_level(100) == 255, "backlight_level 100");
-    check(backlight_level(5) == 12, "backlight_level 5");
-    check(backlight_level(0) == 12, "backlight_level 0 clamps to 5");
+    check(backlight_level(10) == 1, "backlight_level 10");
+    check(backlight_level(0) == 1, "backlight_level 0 clamps to 10");
+    check(backlight_level(20) == 29, "backlight_level 20");
   }
   {
-    const int w = 320;
-    const int h = 240;
-    check(display_page_hit(20, 18, w, h) == DisplayPageHit::Back,
-          "display_page_hit (20, 18) Back");
-    check(display_page_hit(20, 35, w, h) == DisplayPageHit::None,
-          "display_page_hit (20, 35) None");
-    check(display_page_hit(160, 60, w, h) == DisplayPageHit::Mode,
-          "display_page_hit (160, 60) Mode");
-    check(display_page_hit(20, 98, w, h) == DisplayPageHit::DayDown,
-          "display_page_hit (20, 98) DayDown");
-    check(display_page_hit(160, 98, w, h) == DisplayPageHit::None,
-          "display_page_hit (160, 98) None");
-    check(display_page_hit(300, 98, w, h) == DisplayPageHit::DayUp,
-          "display_page_hit (300, 98) DayUp");
-    check(display_page_hit(20, 140, w, h) == DisplayPageHit::NightDown,
-          "display_page_hit (20, 140) NightDown");
-    check(display_page_hit(20, 180, w, h) == DisplayPageHit::StartDown,
-          "display_page_hit (20, 180) StartDown");
-    check(display_page_hit(300, 180, w, h) == DisplayPageHit::StartUp,
-          "display_page_hit (300, 180) StartUp");
-    check(display_page_hit(300, 218, w, h) == DisplayPageHit::EndUp,
-          "display_page_hit (300, 218) EndUp");
-    check(display_page_hit(20, 120, w, h) == DisplayPageHit::None,
-          "display_page_hit (20, 120) None");
+    check(next_color_mode(ColorMode::Auto) == ColorMode::Day,
+          "next_color_mode Auto -> Day");
+    check(next_color_mode(ColorMode::Night) == ColorMode::Auto,
+          "next_color_mode Night -> Auto");
   }
 
   return failures;

@@ -1,0 +1,29 @@
+name: host
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: compiler
+        run: |
+          if ! command -v g++ >/dev/null 2>&1; then
+            if [ "$(id -u)" -eq 0 ]; then
+              apt-get update && apt-get install -y g++
+            else
+              sudo apt-get update && sudo apt-get install -y g++
+            fi
+          fi
+      - name: behavior tests
+        run: g++ -std=c++11 -Wall -Wextra -Werror -I include test/alarm_face_test.cpp -o /tmp/alarm_face_test && /tmp/alarm_face_test
+      - name: screen pictures
+        run: |
+          g++ -std=c++11 -Wall -Wextra -Werror -I include test/render_screens.cpp -o /tmp/render_screens
+          rm -rf /tmp/screens
+          mkdir /tmp/screens
+          /tmp/render_screens /tmp/screens
+          diff -ru test/screens /tmp/screens

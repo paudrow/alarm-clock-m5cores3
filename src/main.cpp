@@ -13,8 +13,9 @@ enum class Screen {
   Menu,
   AlarmPage,
   SoundPage,
-  ClockPage,
-  DisplayPage,
+  DayPage,
+  NightPage,
+  WhenPage,
 };
 
 uint16_t ink = TFT_RED;
@@ -129,7 +130,7 @@ struct TimePaint {
   int h;
   float scale;
   bool use_font8;
-  char text[16];
+  char text[24];
 };
 
 void draw_ring_actions(bool ringing, bool erase) {
@@ -151,13 +152,20 @@ void draw_ring_actions(bool ringing, bool erase) {
   draw_button(stop, "Stop");
 }
 
-void draw_clock_time(const m5::rtc_datetime_t& dt, TimeFormat fmt, bool entering,
-                     bool enabled, bool skip_next, bool ringing,
-                     bool* last_enabled, bool* last_skip_next, bool* last_ringing,
-                     TimePaint* last) {
-  char buf[16];
-  format_time(buf, sizeof(buf), fmt, dt.time.hours, dt.time.minutes,
-              dt.time.seconds);
+void draw_clock_time(const m5::rtc_datetime_t& dt, TimeFormat fmt,
+                     HourCycle hours, bool entering, bool enabled,
+                     bool skip_next, bool ringing, bool* last_enabled,
+                     bool* last_skip_next, bool* last_ringing, TimePaint* last) {
+  char digits[16];
+  char period[4];
+  format_clock_face(digits, sizeof(digits), period, sizeof(period), fmt,
+                    dt.time.hours, dt.time.minutes, dt.time.seconds, hours);
+  char buf[24];
+  if (period[0] == '\0') {
+    std::snprintf(buf, sizeof(buf), "%s", digits);
+  } else {
+    std::snprintf(buf, sizeof(buf), "%s %s", digits, period);
+  }
   const bool enabled_changed = enabled != *last_enabled;
   const bool skip_changed = skip_next != *last_skip_next;
   const bool ringing_changed = ringing != *last_ringing;
@@ -169,20 +177,26 @@ void draw_clock_time(const m5::rtc_datetime_t& dt, TimeFormat fmt, bool entering
   const int w = M5.Display.width();
   const int h = M5.Display.height();
 
-  bool use_font8 = buf[0] != '\0';
+  bool use_font8 = digits[0] != '\0';
   M5.Display.setTextSize(1);
   M5.Display.setFont(&fonts::Font8);
-  int tw = M5.Display.textWidth(buf);
+  int tw = M5.Display.textWidth(digits);
   int th = M5.Display.fontHeight();
-  if (buf[0] == '\0' || tw > w - 8) {
+  if (digits[0] == '\0' || tw > w - 8) {
     use_font8 = false;
     M5.Display.setFont(&fonts::Font7);
-    tw = M5.Display.textWidth(buf);
+    tw = M5.Display.textWidth(digits);
     th = M5.Display.fontHeight();
   }
+  M5.Display.setFont(&fonts::Font4);
+  M5.Display.setTextSize(1);
+  const int pw = period[0] == '\0' ? 0 : M5.Display.textWidth(period);
+  const int ph = period[0] == '\0' ? 0 : M5.Display.fontHeight();
+  const int gap = period[0] == '\0' ? 0 : 8;
   float scale = 1;
   if (tw > 0 && th > 0) {
-    const float sx = static_cast<float>(w - 8) / static_cast<float>(tw);
+    const float room = static_cast<float>(w - 8 - gap - pw);
+    const float sx = room / static_cast<float>(tw);
     const float sy = 150.f / static_cast<float>(th);
     scale = sx < sy ? sx : sy;
     if (scale < 1.f) {
@@ -205,16 +219,20 @@ void draw_clock_time(const m5::rtc_datetime_t& dt, TimeFormat fmt, bool entering
   const int floor_y = ringing ? ring_action_box(w, h, false).y - 6 : h - 4;
   const int scaled_w = static_cast<int>(tw * scale);
   const int scaled_h = static_cast<int>(th * scale);
+  const int total_w = scaled_w + gap + pw;
+  const int total_h = scaled_h > ph ? scaled_h : ph;
   int cy = h / 2 + 8;
-  if (cy - scaled_h / 2 < 48) {
-    cy = 48 + scaled_h / 2;
+  if (cy - total_h / 2 < 48) {
+    cy = 48 + total_h / 2;
   }
-  if (cy + scaled_h / 2 > floor_y) {
-    cy = floor_y - scaled_h / 2;
+  if (cy + total_h / 2 > floor_y) {
+    cy = floor_y - total_h / 2;
   }
   const int cx = w / 2;
-  const int box_x = cx - scaled_w / 2;
-  const int box_y = cy - scaled_h / 2;
+  const int box_x = cx - total_w / 2;
+  const int box_y = cy - total_h / 2;
+  const int digit_cx = box_x + scaled_w / 2;
+  const int period_cx = box_x + scaled_w + gap + pw / 2;
 
   const bool font_changed = use_font8 != last->use_font8 || scale != last->scale;
   const bool shorter = std::strlen(buf) < std::strlen(last->text);
@@ -224,11 +242,16 @@ void draw_clock_time(const m5::rtc_datetime_t& dt, TimeFormat fmt, bool entering
     M5.Display.fillRect(last->x, last->y, last->w, last->h, TFT_BLACK);
   }
   M5.Display.setTextColor(ink, TFT_BLACK);
-  M5.Display.setFont(use_font8 ? &fonts::Font8 : &fonts::Font7);
-  M5.Display.setTextSize(scale);
   M5.Display.setTextDatum(middle_center);
-  if (buf[0] != '\0') {
-    M5.Display.drawString(buf, cx, cy);
+  if (digits[0] != '\0') {
+    M5.Display.setFont(use_font8 ? &fonts::Font8 : &fonts::Font7);
+    M5.Display.setTextSize(scale);
+    M5.Display.drawString(digits, digit_cx, cy);
+  }
+  if (period[0] != '\0') {
+    M5.Display.setFont(&fonts::Font4);
+    M5.Display.setTextSize(1);
+    M5.Display.drawString(period, period_cx, cy);
   }
   draw_gear();
   draw_bell(enabled, entering || enabled_changed);
@@ -243,8 +266,8 @@ void draw_clock_time(const m5::rtc_datetime_t& dt, TimeFormat fmt, bool entering
 
   last->x = box_x;
   last->y = box_y;
-  last->w = scaled_w;
-  last->h = scaled_h;
+  last->w = total_w;
+  last->h = total_h;
   last->scale = scale;
   last->use_font8 = use_font8;
   std::strcpy(last->text, buf);
@@ -264,11 +287,11 @@ void draw_menu() {
   M5.Display.drawString("Menu", w - 8, row_mid_y(0, 5, h));
   draw_button(centered_button(1, 5, w, h, 180), "Alarm");
   draw_button(centered_button(2, 5, w, h, 180), "Sound");
-  draw_button(centered_button(3, 5, w, h, 180), "Clock");
-  draw_button(centered_button(4, 5, w, h, 180), "Display");
+  draw_button(centered_button(3, 5, w, h, 180), "Day");
+  draw_button(centered_button(4, 5, w, h, 180), "Night");
 }
 
-void draw_alarm_page(const Alarm& alarm, int dirty_row) {
+void draw_alarm_page(const Alarm& alarm, HourCycle hours, int dirty_row) {
   const int w = M5.Display.width();
   const int h = M5.Display.height();
   M5.Display.setTextColor(ink, TFT_BLACK);
@@ -285,9 +308,11 @@ void draw_alarm_page(const Alarm& alarm, int dirty_row) {
     if (dirty_row == 1) {
       fill_row(1, 3);
     }
+    char when[16];
+    format_time(when, sizeof(when), TimeFormat::HoursMinutes, alarm.at.hour,
+                alarm.at.minute, 0, hours);
     char buf[32];
-    std::snprintf(buf, sizeof(buf), "%02d:%02d  %s", alarm.at.hour,
-                  alarm.at.minute, alarm.enabled ? "ON" : "OFF");
+    std::snprintf(buf, sizeof(buf), "%s  %s", when, alarm.enabled ? "ON" : "OFF");
     draw_button(centered_button(1, 3, w, h, 220), buf);
   }
   if (dirty_row < 0 || dirty_row == 2) {
@@ -313,49 +338,45 @@ void draw_sound_page(int volume, int soft_volume, int gentle_seconds,
 
   if (dirty_row < 0 || dirty_row == 0) {
     if (dirty_row == 0) {
-      fill_row(0, 6);
+      fill_row(0, 5);
     }
-    draw_button(back_button(6, w, h), "Back");
+    draw_button(back_button(5, w, h), "Back");
   }
   if (dirty_row < 0 || dirty_row == 1) {
     if (dirty_row == 1) {
-      fill_row(1, 6);
+      fill_row(1, 5);
     }
     char buf[24];
     std::snprintf(buf, sizeof(buf), "Loud %d", volume);
-    draw_level_row(1, 6, buf);
+    draw_level_row(1, 5, buf);
   }
   if (dirty_row < 0 || dirty_row == 2) {
     if (dirty_row == 2) {
-      fill_row(2, 6);
+      fill_row(2, 5);
     }
     char buf[24];
     std::snprintf(buf, sizeof(buf), "Soft %d", soft_volume);
-    draw_level_row(2, 6, buf);
+    draw_level_row(2, 5, buf);
   }
   if (dirty_row < 0 || dirty_row == 3) {
     if (dirty_row == 3) {
-      fill_row(3, 6);
+      fill_row(3, 5);
     }
     char buf[24];
     std::snprintf(buf, sizeof(buf), "%ds then loud", gentle_seconds);
-    draw_level_row(3, 6, buf);
+    draw_level_row(3, 5, buf);
   }
   if (dirty_row < 0 || dirty_row == 4) {
     if (dirty_row == 4) {
-      fill_row(4, 6);
+      fill_row(4, 5);
     }
-    draw_button(centered_button(4, 6, w, h, 200), "Preview soft");
-  }
-  if (dirty_row < 0 || dirty_row == 5) {
-    if (dirty_row == 5) {
-      fill_row(5, 6);
-    }
-    draw_button(centered_button(5, 6, w, h, 200), "Preview loud");
+    draw_button(column_button(4, 5, 0, 2, w, h), "Preview soft");
+    draw_button(column_button(4, 5, 1, 2, w, h), "Preview loud");
   }
 }
 
-void draw_clock_page(TimeFormat day_fmt, TimeFormat night_fmt, int dirty_row) {
+void draw_day_page(int day_bright, TimeFormat day_fmt, HourCycle hours,
+                   int dirty_row) {
   const int w = M5.Display.width();
   const int h = M5.Display.height();
   M5.Display.setTextColor(ink, TFT_BLACK);
@@ -364,25 +385,117 @@ void draw_clock_page(TimeFormat day_fmt, TimeFormat night_fmt, int dirty_row) {
 
   if (dirty_row < 0 || dirty_row == 0) {
     if (dirty_row == 0) {
-      fill_row(0, 3);
+      fill_row(0, 4);
     }
-    draw_button(back_button(3, w, h), "Back");
+    draw_button(back_button(4, w, h), "Back");
   }
   if (dirty_row < 0 || dirty_row == 1) {
     if (dirty_row == 1) {
-      fill_row(1, 3);
+      fill_row(1, 4);
     }
     char buf[24];
-    std::snprintf(buf, sizeof(buf), "Day %s", format_label(day_fmt));
-    draw_button(centered_button(1, 3, w, h, 220), buf);
+    std::snprintf(buf, sizeof(buf), "Bright %d", day_bright);
+    draw_level_row(1, 4, buf);
   }
   if (dirty_row < 0 || dirty_row == 2) {
     if (dirty_row == 2) {
-      fill_row(2, 3);
+      fill_row(2, 4);
     }
     char buf[24];
-    std::snprintf(buf, sizeof(buf), "Night %s", format_label(night_fmt));
-    draw_button(centered_button(2, 3, w, h, 220), buf);
+    std::snprintf(buf, sizeof(buf), "Face %s", format_label(day_fmt));
+    draw_button(centered_button(2, 4, w, h, 220), buf);
+  }
+  if (dirty_row < 0 || dirty_row == 3) {
+    if (dirty_row == 3) {
+      fill_row(3, 4);
+    }
+    draw_button(centered_button(3, 4, w, h, 220), hour_cycle_label(hours));
+  }
+}
+
+void draw_night_page(int night_bright, TimeFormat night_fmt, HourCycle hours,
+                     Hm night_start, Hm night_end, int dirty_row) {
+  const int w = M5.Display.width();
+  const int h = M5.Display.height();
+  M5.Display.setTextColor(ink, TFT_BLACK);
+  M5.Display.setFont(&fonts::Font4);
+  M5.Display.setTextSize(1);
+
+  if (dirty_row < 0 || dirty_row == 0) {
+    if (dirty_row == 0) {
+      fill_row(0, 5);
+    }
+    draw_button(back_button(5, w, h), "Back");
+  }
+  if (dirty_row < 0 || dirty_row == 1) {
+    if (dirty_row == 1) {
+      fill_row(1, 5);
+    }
+    char buf[24];
+    std::snprintf(buf, sizeof(buf), "Bright %d", night_bright);
+    draw_level_row(1, 5, buf);
+  }
+  if (dirty_row < 0 || dirty_row == 2) {
+    if (dirty_row == 2) {
+      fill_row(2, 5);
+    }
+    char buf[24];
+    std::snprintf(buf, sizeof(buf), "Face %s", format_label(night_fmt));
+    draw_button(centered_button(2, 5, w, h, 220), buf);
+  }
+  if (dirty_row < 0 || dirty_row == 3) {
+    if (dirty_row == 3) {
+      fill_row(3, 5);
+    }
+    draw_button(centered_button(3, 5, w, h, 220), hour_cycle_label(hours));
+  }
+  if (dirty_row < 0 || dirty_row == 4) {
+    if (dirty_row == 4) {
+      fill_row(4, 5);
+    }
+    char buf[24];
+    std::snprintf(buf, sizeof(buf), "%02d:%02d-%02d:%02d", night_start.hour,
+                  night_start.minute, night_end.hour, night_end.minute);
+    draw_button(centered_button(4, 5, w, h, 220), buf);
+  }
+}
+
+void draw_when_page(ColorMode mode, Hm night_start, Hm night_end, int dirty_row) {
+  const int w = M5.Display.width();
+  const int h = M5.Display.height();
+  M5.Display.setTextColor(ink, TFT_BLACK);
+  M5.Display.setFont(&fonts::Font4);
+  M5.Display.setTextSize(1);
+
+  if (dirty_row < 0 || dirty_row == 0) {
+    if (dirty_row == 0) {
+      fill_row(0, 4);
+    }
+    draw_button(back_button(4, w, h), "Back");
+  }
+  if (dirty_row < 0 || dirty_row == 1) {
+    if (dirty_row == 1) {
+      fill_row(1, 4);
+    }
+    draw_button(centered_button(1, 4, w, h, 220), color_mode_label(mode));
+  }
+  if (dirty_row < 0 || dirty_row == 2) {
+    if (dirty_row == 2) {
+      fill_row(2, 4);
+    }
+    char buf[24];
+    std::snprintf(buf, sizeof(buf), "Start %02d:%02d", night_start.hour,
+                  night_start.minute);
+    draw_level_row(2, 4, buf);
+  }
+  if (dirty_row < 0 || dirty_row == 3) {
+    if (dirty_row == 3) {
+      fill_row(3, 4);
+    }
+    char buf[24];
+    std::snprintf(buf, sizeof(buf), "End %02d:%02d", night_end.hour,
+                  night_end.minute);
+    draw_level_row(3, 4, buf);
   }
 }
 
@@ -393,68 +506,6 @@ void draw_level_row(int row, int rows, const char* label) {
   draw_button(side_button(row, rows, w, h, true), "+");
   M5.Display.setTextDatum(middle_center);
   M5.Display.drawString(label, w / 2, row_mid_y(row, rows, h));
-}
-
-void draw_display_page(ColorMode mode, int day_bright, int night_bright,
-                       Hm night_start, Hm night_end, int dirty_row) {
-  const int w = M5.Display.width();
-  const int h = M5.Display.height();
-  M5.Display.setTextColor(ink, TFT_BLACK);
-  M5.Display.setFont(&fonts::Font2);
-  M5.Display.setTextSize(1);
-
-  if (dirty_row < 0 || dirty_row == 0) {
-    if (dirty_row == 0) {
-      fill_row(0, 6);
-    }
-    draw_button(back_button(6, w, h), "Back");
-  }
-  if (dirty_row < 0 || dirty_row == 1) {
-    if (dirty_row == 1) {
-      fill_row(1, 6);
-    }
-    const char* name = "Follow clock";
-    if (mode == ColorMode::Day) {
-      name = "Always day";
-    } else if (mode == ColorMode::Night) {
-      name = "Always night";
-    }
-    draw_button(centered_button(1, 6, w, h, 200), name);
-  }
-  if (dirty_row < 0 || dirty_row == 2) {
-    if (dirty_row == 2) {
-      fill_row(2, 6);
-    }
-    char buf[24];
-    std::snprintf(buf, sizeof(buf), "Day bright %d", day_bright);
-    draw_level_row(2, 6, buf);
-  }
-  if (dirty_row < 0 || dirty_row == 3) {
-    if (dirty_row == 3) {
-      fill_row(3, 6);
-    }
-    char buf[24];
-    std::snprintf(buf, sizeof(buf), "Night bright %d", night_bright);
-    draw_level_row(3, 6, buf);
-  }
-  if (dirty_row < 0 || dirty_row == 4) {
-    if (dirty_row == 4) {
-      fill_row(4, 6);
-    }
-    char buf[24];
-    std::snprintf(buf, sizeof(buf), "Start %02d:%02d", night_start.hour,
-                  night_start.minute);
-    draw_level_row(4, 6, buf);
-  }
-  if (dirty_row < 0 || dirty_row == 5) {
-    if (dirty_row == 5) {
-      fill_row(5, 6);
-    }
-    char buf[24];
-    std::snprintf(buf, sizeof(buf), "End %02d:%02d", night_end.hour,
-                  night_end.minute);
-    draw_level_row(5, 6, buf);
-  }
 }
 
 void drive_speaker(Intensity heard, int loud_percent, int soft_percent) {
@@ -517,7 +568,7 @@ Settings capture_settings(const Alarm& alarm, int volume, int soft_volume,
                           int gentle_seconds, TimeFormat day_format,
                           TimeFormat night_format, ColorMode color_mode,
                           Hm night_start, Hm night_end, int day_bright,
-                          int night_bright) {
+                          int night_bright, HourCycle hours) {
   Settings s = {};
   s.magic = kSettingsMagic;
   s.version = kSettingsVersion;
@@ -537,6 +588,7 @@ Settings capture_settings(const Alarm& alarm, int volume, int soft_volume,
   s.night_end_minute = static_cast<uint8_t>(night_end.minute);
   s.day_bright = static_cast<uint8_t>(day_bright);
   s.night_bright = static_cast<uint8_t>(night_bright);
+  s.hour12 = hours == HourCycle::H12 ? 1 : 0;
   return s;
 }
 
@@ -568,7 +620,7 @@ void apply_settings(const Settings& s, Alarm* alarm, int* volume,
                     int* soft_volume, int* gentle_seconds,
                     TimeFormat* day_format, TimeFormat* night_format,
                     ColorMode* color_mode, Hm* night_start, Hm* night_end,
-                    int* day_bright, int* night_bright) {
+                    int* day_bright, int* night_bright, HourCycle* hours) {
   alarm->at.hour = s.alarm_hour;
   alarm->at.minute = s.alarm_minute;
   alarm->enabled = s.alarm_enabled != 0;
@@ -583,8 +635,9 @@ void apply_settings(const Settings& s, Alarm* alarm, int* volume,
   night_start->minute = s.night_start_minute;
   night_end->hour = s.night_end_hour;
   night_end->minute = s.night_end_minute;
-  *day_bright = s.day_bright;
-  *night_bright = s.night_bright;
+  *day_bright = snap_brightness(s.day_bright);
+  *night_bright = snap_brightness(s.night_bright);
+  *hours = s.hour12 ? HourCycle::H12 : HourCycle::H24;
 }
 
 void loop() {
@@ -616,6 +669,7 @@ void loop() {
   static Hm night_end = {7, 0};
   static int day_bright = 70;
   static int night_bright = 20;
+  static HourCycle hours = HourCycle::H24;
   static bool was_night = false;
   static int applied_light = -1;
 
@@ -624,7 +678,7 @@ void loop() {
     if (read_settings(&loaded)) {
       apply_settings(loaded, &alarm, &volume, &soft_volume, &gentle_seconds,
                      &day_format, &night_format, &color_mode, &night_start,
-                     &night_end, &day_bright, &night_bright);
+                     &night_end, &day_bright, &night_bright, &hours);
       stored = loaded;
     }
     settings_ready = true;
@@ -681,12 +735,12 @@ void loop() {
             screen = Screen::SoundPage;
             enter_screen = true;
             break;
-          case MenuHit::ClockFace:
-            screen = Screen::ClockPage;
+          case MenuHit::Day:
+            screen = Screen::DayPage;
             enter_screen = true;
             break;
-          case MenuHit::Display:
-            screen = Screen::DisplayPage;
+          case MenuHit::Night:
+            screen = Screen::NightPage;
             enter_screen = true;
             break;
           default:
@@ -789,91 +843,92 @@ void loop() {
             break;
         }
       }
-    } else if (screen == Screen::ClockPage) {
-      if (edge) {
-        switch (clock_page_hit(t.x, t.y, w, h)) {
-          case ClockPageHit::Back:
-            screen = Screen::Menu;
-            enter_screen = true;
-            break;
-          case ClockPageHit::DayFormat:
-            day_format = next_format(day_format);
-            dirty_row = 1;
-            break;
-          case ClockPageHit::NightFormat:
-            night_format = next_format(night_format);
-            dirty_row = 2;
-            break;
-          default:
-            break;
+    } else if (screen == Screen::DayPage) {
+      const DayPageHit hit = day_page_hit(t.x, t.y, w, h);
+      const bool is_step =
+          hit == DayPageHit::BrightDown || hit == DayPageHit::BrightUp;
+      if (is_step && (edge || (t.isPressed() && millis() >= next_repeat))) {
+        if (hit == DayPageHit::BrightDown) {
+          day_bright = adjust_brightness(day_bright, -10);
+        } else {
+          day_bright = adjust_brightness(day_bright, 10);
+        }
+        dirty_row = 1;
+        next_repeat = millis() + (edge ? 350 : 120);
+      } else if (edge) {
+        if (hit == DayPageHit::Back) {
+          screen = Screen::Menu;
+          enter_screen = true;
+        } else if (hit == DayPageHit::Face) {
+          day_format = next_format(day_format);
+          dirty_row = 2;
+        } else if (hit == DayPageHit::Hour) {
+          hours = next_hour_cycle(hours);
+          dirty_row = 3;
         }
       }
-    } else if (screen == Screen::DisplayPage) {
-      const DisplayPageHit hit = display_page_hit(t.x, t.y, w, h);
-      const bool is_step = hit == DisplayPageHit::DayDown ||
-                           hit == DisplayPageHit::DayUp ||
-                           hit == DisplayPageHit::NightDown ||
-                           hit == DisplayPageHit::NightUp ||
-                           hit == DisplayPageHit::StartDown ||
-                           hit == DisplayPageHit::StartUp ||
-                           hit == DisplayPageHit::EndDown ||
-                           hit == DisplayPageHit::EndUp;
+    } else if (screen == Screen::NightPage) {
+      const NightPageHit hit = night_page_hit(t.x, t.y, w, h);
+      const bool is_step =
+          hit == NightPageHit::BrightDown || hit == NightPageHit::BrightUp;
+      if (is_step && (edge || (t.isPressed() && millis() >= next_repeat))) {
+        if (hit == NightPageHit::BrightDown) {
+          night_bright = adjust_brightness(night_bright, -10);
+        } else {
+          night_bright = adjust_brightness(night_bright, 10);
+        }
+        dirty_row = 1;
+        next_repeat = millis() + (edge ? 350 : 120);
+      } else if (edge) {
+        if (hit == NightPageHit::Back) {
+          screen = Screen::Menu;
+          enter_screen = true;
+        } else if (hit == NightPageHit::Face) {
+          night_format = next_format(night_format);
+          dirty_row = 2;
+        } else if (hit == NightPageHit::Hour) {
+          hours = next_hour_cycle(hours);
+          dirty_row = 3;
+        } else if (hit == NightPageHit::When) {
+          screen = Screen::WhenPage;
+          enter_screen = true;
+        }
+      }
+    } else if (screen == Screen::WhenPage) {
+      const WhenPageHit hit = when_page_hit(t.x, t.y, w, h);
+      const bool is_step = hit == WhenPageHit::StartDown ||
+                           hit == WhenPageHit::StartUp ||
+                           hit == WhenPageHit::EndDown ||
+                           hit == WhenPageHit::EndUp;
       if (is_step && (edge || (t.isPressed() && millis() >= next_repeat))) {
         switch (hit) {
-          case DisplayPageHit::DayDown:
-            day_bright = adjust_brightness(day_bright, -10);
-            dirty_row = 2;
-            break;
-          case DisplayPageHit::DayUp:
-            day_bright = adjust_brightness(day_bright, 10);
-            dirty_row = 2;
-            break;
-          case DisplayPageHit::NightDown:
-            night_bright = adjust_brightness(night_bright, -10);
-            dirty_row = 3;
-            break;
-          case DisplayPageHit::NightUp:
-            night_bright = adjust_brightness(night_bright, 10);
-            dirty_row = 3;
-            break;
-          case DisplayPageHit::StartDown:
+          case WhenPageHit::StartDown:
             night_start = step_minutes(night_start, -30);
-            dirty_row = 4;
+            dirty_row = 2;
             break;
-          case DisplayPageHit::StartUp:
+          case WhenPageHit::StartUp:
             night_start = step_minutes(night_start, 30);
-            dirty_row = 4;
+            dirty_row = 2;
             break;
-          case DisplayPageHit::EndDown:
+          case WhenPageHit::EndDown:
             night_end = step_minutes(night_end, -30);
-            dirty_row = 5;
+            dirty_row = 3;
             break;
-          case DisplayPageHit::EndUp:
+          case WhenPageHit::EndUp:
             night_end = step_minutes(night_end, 30);
-            dirty_row = 5;
+            dirty_row = 3;
             break;
           default:
             break;
         }
         next_repeat = millis() + (edge ? 350 : 120);
       } else if (edge) {
-        switch (hit) {
-          case DisplayPageHit::Back:
-            screen = Screen::Menu;
-            enter_screen = true;
-            break;
-          case DisplayPageHit::Mode:
-            if (color_mode == ColorMode::Auto) {
-              color_mode = ColorMode::Day;
-            } else if (color_mode == ColorMode::Day) {
-              color_mode = ColorMode::Night;
-            } else {
-              color_mode = ColorMode::Auto;
-            }
-            dirty_row = 1;
-            break;
-          default:
-            break;
+        if (hit == WhenPageHit::Back) {
+          screen = Screen::NightPage;
+          enter_screen = true;
+        } else if (hit == WhenPageHit::Mode) {
+          color_mode = next_color_mode(color_mode);
+          dirty_row = 1;
         }
       }
     }
@@ -919,12 +974,21 @@ void loop() {
   const bool night = color_mode == ColorMode::Night ||
                      (color_mode == ColorMode::Auto &&
                       is_night(now_hm, night_start, night_end));
-  ink = night ? TFT_RED : TFT_WHITE;
-  if (night != was_night) {
-    was_night = night;
+  bool show_night = night;
+  int bright_percent = night ? night_bright : day_bright;
+  if (screen == Screen::DayPage) {
+    show_night = false;
+    bright_percent = day_bright;
+  } else if (screen == Screen::NightPage) {
+    show_night = true;
+    bright_percent = night_bright;
+  }
+  ink = show_night ? TFT_RED : TFT_WHITE;
+  if (show_night != was_night) {
+    was_night = show_night;
     enter_screen = true;
   }
-  const int light = backlight_level(night ? night_bright : day_bright);
+  const int light = backlight_level(bright_percent);
   if (light != applied_light) {
     M5.Display.setBrightness(static_cast<uint8_t>(light));
     applied_light = light;
@@ -941,11 +1005,11 @@ void loop() {
       last_enabled = !alarm.enabled;
       last_skip_next = !alarm.skip_next;
       last_ringing = !ringing;
-      draw_clock_time(dt, face, true, alarm.enabled, alarm.skip_next, ringing,
+      draw_clock_time(dt, face, hours, true, alarm.enabled, alarm.skip_next, ringing,
                       &last_enabled, &last_skip_next, &last_ringing, &last_time);
       enter_screen = false;
     } else {
-      draw_clock_time(dt, face, false, alarm.enabled, alarm.skip_next, ringing,
+      draw_clock_time(dt, face, hours, false, alarm.enabled, alarm.skip_next, ringing,
                       &last_enabled, &last_skip_next, &last_ringing, &last_time);
     }
   } else if (screen == Screen::Menu) {
@@ -958,11 +1022,11 @@ void loop() {
   } else if (screen == Screen::AlarmPage) {
     if (enter_screen) {
       M5.Display.fillScreen(TFT_BLACK);
-      draw_alarm_page(alarm, -1);
+      draw_alarm_page(alarm, hours, -1);
       enter_screen = false;
       dirty_row = -1;
     } else if (dirty_row >= 0) {
-      draw_alarm_page(alarm, dirty_row);
+      draw_alarm_page(alarm, hours, dirty_row);
       dirty_row = -1;
     }
   } else if (screen == Screen::SoundPage) {
@@ -979,26 +1043,36 @@ void loop() {
       draw_sound_page(volume, soft_volume, gentle_seconds, dirty_row);
       dirty_row = -1;
     }
-  } else if (screen == Screen::ClockPage) {
+  } else if (screen == Screen::DayPage) {
     if (enter_screen) {
       M5.Display.fillScreen(TFT_BLACK);
-      draw_clock_page(day_format, night_format, -1);
+      draw_day_page(day_bright, day_format, hours, -1);
       enter_screen = false;
       dirty_row = -1;
     } else if (dirty_row >= 0) {
-      draw_clock_page(day_format, night_format, dirty_row);
+      draw_day_page(day_bright, day_format, hours, dirty_row);
       dirty_row = -1;
     }
-  } else if (screen == Screen::DisplayPage) {
+  } else if (screen == Screen::NightPage) {
     if (enter_screen) {
       M5.Display.fillScreen(TFT_BLACK);
-      draw_display_page(color_mode, day_bright, night_bright, night_start,
-                        night_end, -1);
+      draw_night_page(night_bright, night_format, hours, night_start, night_end,
+                      -1);
       enter_screen = false;
       dirty_row = -1;
     } else if (dirty_row >= 0) {
-      draw_display_page(color_mode, day_bright, night_bright, night_start,
-                        night_end, dirty_row);
+      draw_night_page(night_bright, night_format, hours, night_start, night_end,
+                      dirty_row);
+      dirty_row = -1;
+    }
+  } else if (screen == Screen::WhenPage) {
+    if (enter_screen) {
+      M5.Display.fillScreen(TFT_BLACK);
+      draw_when_page(color_mode, night_start, night_end, -1);
+      enter_screen = false;
+      dirty_row = -1;
+    } else if (dirty_row >= 0) {
+      draw_when_page(color_mode, night_start, night_end, dirty_row);
       dirty_row = -1;
     }
   }
@@ -1007,18 +1081,18 @@ void loop() {
     last_logged_second = dt.time.seconds;
     Serial.printf(
         "%02d:%02d:%02d %s alarm=%02d:%02d %s skip=%d vol=%d svol=%d soft=%d "
-        "dfmt=%s nfmt=%s tone=%s light=%d\n",
+        "dfmt=%s nfmt=%s tone=%s bright=%d\n",
         dt.time.hours, dt.time.minutes, dt.time.seconds,
         occurrence_name(occurrence), alarm.at.hour, alarm.at.minute,
         alarm.enabled ? "on" : "off", alarm.skip_next ? 1 : 0, volume,
         soft_volume, gentle_seconds, format_name(day_format),
-        format_name(night_format), night ? "night" : "day", light);
+        format_name(night_format), night ? "night" : "day", bright_percent);
   }
 
   const Settings current =
       capture_settings(alarm, volume, soft_volume, gentle_seconds, day_format,
                        night_format, color_mode, night_start, night_end,
-                       day_bright, night_bright);
+                       day_bright, night_bright, hours);
   if (std::memcmp(&current, &stored, sizeof(current)) != 0) {
     if (settings_valid(current)) {
       write_settings(current);
