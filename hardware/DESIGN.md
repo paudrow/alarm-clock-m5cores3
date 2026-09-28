@@ -26,12 +26,12 @@ Requirements:
 
 | Block | Recommendation |
 | --- | --- |
-| MCU | **ESP32-P4**. It has no radio at all, drives both small QSPI screens and large MIPI-DSI screens, and has 32 MB of in-package PSRAM (P4NRW32). For V4, Wi-Fi is added as a separate ESP32-C6, which is how Espressif's own P4 boards do it. |
+| MCU | **ESP32-P4**, chip revision v3.x (**ESP32-P4NRW32X**). It has no radio at all, drives both small QSPI screens and large MIPI-DSI screens, and has 32 MB of in-package PSRAM. For V4, Wi-Fi is added as a separate ESP32-C6, which is how Espressif's own P4 boards do it. |
 | Screen | **~4″ AMOLED + capacitive touch over MIPI-DSI.** The reference part is LilyGO's 4.1″ 1232×568 AMOLED (RM69A10 driver, GT9895 touch) on the T-Display-P4. |
 | Firmware display stack | Draw into an off-screen canvas, then hand the frame to ESP-IDF's `esp_lcd` panel driver. The panel driver is the only per-screen code. |
 | Sounds | White/pink/brown noise generated live; fire pit, rain, etc. as long recordings, on a microSD card in V2 and onboard SPI NAND in production. |
-| Audio out | I2S amp (MAX98357A) + a good 2–2.5″ full-range driver in a sealed, damped chamber. |
-| Red lamp | 660 nm LEDs on a linear constant-current sink with an analog set-point, so no PWM and zero flicker. |
+| Audio out | I2S amp (MAX98357A) + a 2″ full-range driver (reference: Tectonic TEBM35C10-4 BMR) **firing out the back** of a sealed, wool-damped chamber. |
+| Red lamp | 660 nm LEDs on a linear constant-current sink with an analog set-point, so no PWM and zero flicker. They shine down into a **low-iron glass base** the clock stands on. |
 | Timekeeping | High-accuracy RTC (RV-3028-C7, ±1 ppm at 25 °C) backed by a supercap (no battery to ship or replace). Manual set and drift trim in the UI, DST rules in firmware. |
 | Power | USB-C, 5 V / 3 A. The same port flashes the board. |
 
@@ -129,7 +129,7 @@ The panel's own cover glass is the touch surface. Keep it flush with or slightly
 ### Hardware
 
 - **Amp: MAX98357A.** I2S in, mono class-D, up to about 3 W into 4 Ω from 5 V. It runs directly off VBUS, and its SD_MODE pin lets firmware hard-mute it so there's no idle hiss.
-- **Speaker:** a 2–2.5″ full-range driver, 4 Ω. At bedside volume the speaker and its box set the quality, far more than the DAC.
+- **Speaker:** a 2″ full-range driver, 4 Ω, firing out the back of the case. The reference is the Tectonic TEBM35C10-4 BMR: shallow, wide dispersion, made for small boxes. The Dayton ND65-4 (2.5″) is the listening comparison. At bedside volume the speaker and its box set the quality, far more than the DAC.
 - **Enclosure (matters most in a metal case):**
   - Sealed rear chamber of a few hundred mL, filled with wool felt or wool batting.
   - Constrained-layer damping (butyl or bitumen mat) on large flat panels, so the case doesn't ring or buzz.
@@ -138,7 +138,10 @@ The panel's own cover glass is the touch surface. Keep it flush with or slightly
 
 ## Red lamp (660 nm)
 
-- Use **655–660 nm deep-red mid-power LEDs** (3528/5050 class) behind a diffuser, so there's no hot spot. 660 nm looks dimmer per watt than 625 nm, so plan for a few more LEDs than you'd expect.
+- Use **660 nm deep-red mid-power LEDs**. The reference is the ams OSRAM OSCONIQ P 3030 Hyper Red (GH QSSPA1.24), about 4 of them.
+  - They sit on the underside of the PCB and shine down into the ½″ low-iron glass base. Its sandblasted underside diffuses the light, so there's no hot spot (see `MANUFACTURING.md`).
+  - "660 nm" is the peak wavelength; the colour the eye reads is ~640 nm. That's normal for deep-red LEDs.
+  - 660 nm looks dimmer per watt than 625 nm, so size the current range with the real glass on the bench.
 - **Driver: DC current, not PWM.** PWM gets worse (shorter pulses) exactly at dim night settings.
 
 ```
@@ -165,13 +168,25 @@ The panel's own cover glass is the touch surface. Keep it flush with or slightly
 - **Protection:**
   - TVS diode + polyfuse or eFuse on VBUS.
   - ESD array (USBLC6-2 class) on D+/D−.
-- **Rails:** a buck to 3.3 V. The P4 and the AMOLED need extra rails (panel ELVDD/ELVSS, P4 core); take these from the module's or panel's reference design rather than inventing them.
+- **Rails** (exact parts in `BOM.md`):
+  - **3.3 V**: a 2 A buck for everything.
+  - **P4 core (VDD_HP, 0.99–1.3 V)**: a small external buck that the P4 enables and sets itself, on Espressif's verified list (for example SY8088).
+  - **Panel VBAT (~3.8–4.0 V)**: the 4.1″ panel's FPC takes a battery-level supply and makes its own OLED voltages from it (T-Display-P4 schematic). From USB, a small buck makes it. Confirm the allowed range in the panel datasheet.
+
+  3.3 V flash works with the P4 as-is (no 1.8 V rail needed).
 - **Budget at 15 W:**
   - P4 + screen: ~1–1.5 W
   - Lamp: < 1.5 W
   - Audio: ~3 W peak
 
   That leaves plenty of margin.
+
+## ESP32-P4 chip revision
+
+Use **revision v3.x (ESP32-P4NRW32X)** for any new board. The v1.x part (ESP32-P4NRW32) is not recommended for new designs. What changes with v3:
+- **PCB:** pin 54 becomes a supply pin (VDD_HP_1), a resistor on the USB DP pin changes, and the core-buck circuit gains two 499 kΩ resistors and a 22 pF capacitor. Follow Espressif's v3 hardware design guidelines and schematic checklist.
+- **Firmware:** v1 and v3 images aren't interchangeable. Build with `CONFIG_ESP32P4_REV_MIN` set to v3 for the custom board. The T-Display-P4 may carry either revision, so check its chip revision at boot on the V2 bench.
+- **Speed:** v3 runs at 400 MHz (v1: 360 MHz).
 
 ## Metal case notes
 
@@ -212,5 +227,5 @@ The panel's own cover glass is the touch surface. Keep it flush with or slightly
 
 ## Still open
 
-- 4.1″ wide (recommended, bigger digits) vs. a 4″ 4:3 panel.
 - V3 route (a) carrier or (b) fully custom. Decide after V2.
+- Whether the RM69A10 panel dims by PWM. Its public datasheet doesn't say (brightness command `0x51`, 8/10/12-bit), so measure it.
