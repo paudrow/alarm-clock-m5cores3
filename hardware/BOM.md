@@ -1,11 +1,12 @@
 # Bill of materials
 
-Three buying lists, then the production cost estimate:
+Three buying lists, then the costs:
 
 1. **V2 breadboard:** electronics to buy now, quantity 1.
 2. **Enclosure prototype:** metal, glass, hardware, finishing and tooling for the first shop-built case.
 3. **Production electronics:** exact parts with LCSC numbers for JLCPCB assembly.
-4. **Production cost estimate:** per unit at ~1,000 units, plus one-time costs.
+4. **Prototype budget:** what each later stage (V3, V4, a pilot batch) is likely to cost.
+5. **Production cost estimate:** per unit at ~1,000 units, plus one-time costs.
 
 **How far these are checked.** Every part number and product link below appeared in web-search results for that exact product page. The vendor sites themselves couldn't be opened from here.
 - Prices are from search snippets, so treat them as close but **re-check price and stock in the cart**.
@@ -169,7 +170,81 @@ For the custom PCB (V3 route (b), or the parts of route (a) that are on your car
 | Display FPC | **placeholder**: 0.5 mm, pin count per panel | — | — | e.g. C19273956 (40-pin) | — | ~$0.07 | The T-Display-P4 panel uses a **31-pin** MIPI FPC. Pick the exact connector from the panel's drawing. |
 | Touch FPC | **placeholder**: 0.5 mm 6-pin ZIF | JUSHUO | — | C262655 | — | ~$0.05 | Only if touch is on a separate FPC (on the T-Display-P4 it shares the 31-pin one) |
 
-## 4. Production cost estimate
+## 4. Prototype budget (V2 → first sales)
+
+Estimates for **cash spent**, not counting your time or the CNC mill itself. They assume JLCPCB-style prototype pricing and roughly two builds per stage (one to learn from, one that works).
+
+### V2: breadboard (from sections 1–2)
+
+| Item | ≈ Cost |
+| --- | --- |
+| Electronics (section 1) | $270 |
+| Printed mock-up cases, filament | $10–20 |
+| Shipping from ~6 vendors | $40–60 |
+| **Total** | **≈ $320–350** |
+
+### V3 route (a): carrier board, with the T-Display-P4 inside
+
+This is the cheapest way to a working clock in a real aluminium case.
+
+| Item | ≈ Cost | Notes |
+| --- | --- | --- |
+| One more T-Display-P4 (the second unit; the V2 one becomes the first) | $120 | |
+| Carrier PCB: 2-layer, 5 boards assembled, **× 2 spins** | $150–300 | ~$60–120 per spin. It has power, amp, lamp driver and RTC, and no high-speed lines. |
+| Speakers, LEDs, RTC, supercaps for 2 units | $40–60 | |
+| Enclosure for 2 cases: metal, glass, hardware, wool, cork, Dynamat (section 2) | $250–400 | The glass is the least certain line: ~$30–80 a piece in ones and twos |
+| Black anodizing, one lot | $65–150 | Put both cases in the same lot |
+| CNC tooling (section 2), one-time | $150–300 | |
+| Shipping and extras | $100 | |
+| **Total for 2 working clocks** | **≈ $900–1,400** | |
+
+### V3 route (b): fully custom PCB (ESP32-P4 + bare panel)
+
+| Item | ≈ Cost | Notes |
+| --- | --- | --- |
+| 4-layer impedance-controlled PCB, 5 boards assembled, **× 2–3 spins** | $400–900 | ~$150–300 per spin. The P4's 104-pin QFN and the DSI routing mean the first spin rarely works completely. |
+| Bare 4.1″ AMOLED panels + touch, 3–5 samples | $100–300 | Depends on finding a supplier with a datasheet. The fallback is a panel from a T-Display-P4 ($120). |
+| Debug gear, if you don't have it: hot-air station, USB logic analyser | $100–250 | |
+| Enclosure, anodizing, tooling, speakers, as route (a) | $500–850 | |
+| Shipping and extras | $150 | |
+| **Total for 2–3 working clocks** | **≈ $1,250–2,450** | |
+
+### V4: Wi-Fi and/or battery (optional)
+
+| Item | ≈ Cost |
+| --- | --- |
+| One more board spin with an ESP32-C6-MINI-1U module, antenna, LiPo and charger | $250–500 |
+| Case changes (antenna window or bulkhead connector) | $50–150 |
+| **Total** | **≈ $300–650** |
+
+### Pilot batch: 10–20 clocks to sell or give to beta testers
+
+| Item | ≈ Cost | Notes |
+| --- | --- | --- |
+| Per clock: assembled PCB ~$25–40, panel ~$25–40, glass ~$20–40, speaker ~$9, aluminium and hardware ~$15, anodizing share ~$8, packaging ~$5 | **$110–160 each** | Small-quantity prices; they fall towards the section 5 figures with volume |
+| 15 clocks | $1,650–2,400 | |
+| Test fixture and jigs (mostly printed) | $200–500 | |
+| EMC pre-compliance scan at a lab (a few hours) | $500–1,500 | Catches problems before the real test |
+| FCC Part 15B + CE EMC certification | $3,000–6,000 | Needed before selling. No radio, so no FCC ID and no radio testing. |
+| **Total** | **≈ $5,300–10,400** | |
+
+### Running total to a first sellable batch
+
+| Path | ≈ Cash |
+| --- | --- |
+| V2 → V3 (a) carrier → pilot of 15 | **$6,500–12,000** |
+| V2 → V3 (a) → V3 (b) custom → pilot of 15 | **$7,800–14,500** |
+
+Certification and the pilot batch are most of it. **The prototypes themselves (V2 + V3) are about $1,200–3,000.**
+
+Ways to keep it down:
+- Do route (a) first. It proves the case, sound and lamp for under $1,500 before committing to the harder custom board.
+- Order 5 boards per spin, and panelize the small lamp or carrier boards with the main board.
+- Use JLCPCB Basic parts where possible, since each Extended part adds a setup fee per order.
+- Batch the anodizing: finish several iterations' parts in one lot.
+- Buy glass bases in tens from a local glass shop once the size is fixed.
+
+## 5. Production cost estimate
 
 Per unit at ~1,000 units. These are estimates; replace each with a quote before setting a price.
 
