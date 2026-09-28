@@ -61,16 +61,20 @@ See `DESIGN.md` for why each part was chosen.
 | --- | --- | --- |
 | ~4.1″ AMOLED panel + capacitive touch + cover lens | **$15–35** | **Get quotes.** Ask the panel vendor for a custom black-printed cover lens ("dead front") so the panel edges disappear. |
 
-### Enclosure (high-end look, sensible cost)
+### Enclosure (aluminium, no visible plastic)
+
+Construction is tube + two end caps + an internal sled; see `MANUFACTURING.md`. Costs are for the small-production stage (stock tube, outsourced caps, batch anodizing). In your own shop, most of the cost is machine time instead.
 
 | Part | ≈ Each | Notes |
 | --- | --- | --- |
-| Aluminium extrusion body, cut to length, CNC'd for screen window + grille holes, bead-blast + anodize | $6–12 | Extrusion die is a one-time ~$500–2,000 |
-| Two end caps (CNC aluminium, or die-cast later) | $4–10 | One carries the USB-C opening; one the button |
-| Lamp diffuser (opal PMMA, laser-cut or molded) | $0.50 | |
-| Speaker gasket, damping mat, polyfill | $0.80 | |
-| Screws, rubber feet, panel adhesive (VHB) | $0.60 | |
-| **Subtotal** | **≈ $12–24** | |
+| Body: 6063 square tube (e.g. 3″ × 3″ × ⅛″), cut to ~150 mm, CNC'd for screen window, grille slots, lamp slot; bead-blast + anodize | $6–12 | Stock tube needs no tooling. A custom extrusion (one-time ~$500–2,000) only pays off after a few hundred units. |
+| Two end caps, CNC 6061 | $4–10 | One carries the USB-C opening, one the button |
+| Sled: bent 5052 sheet or machined plate, with speaker bulkhead | $2–4 | Holds PCB, speaker chamber and lamp; slides in as one tested unit |
+| Glass retaining frame (aluminium) + thin gasket | $1–2 | Holds the cover glass against the window lip, no adhesive |
+| Lamp diffuser: sandblasted or acid-etched glass, or none (indirect wash off the table) | $0–1 | |
+| Speaker O-ring, wool felt damping, wool acoustic cloth behind grille | $0.80 | |
+| M3 stainless screws, aluminium/brass standoffs, cork or wool felt feet | $0.80 | One screw size throughout |
+| **Subtotal** | **≈ $15–30** | |
 
 ### Speaker
 
@@ -94,11 +98,11 @@ See `DESIGN.md` for why each part was chosen.
 | --- | --- | --- |
 | Main PCB | $24 | $26 |
 | Display | $15 | $35 |
-| Enclosure | $12 | $24 |
+| Enclosure | $15 | $30 |
 | Speaker | $3 | $8 |
 | Box contents | $6 | $10 |
 | End-of-line test + programming | $0.50 | $1 |
-| **Landed BOM** | **≈ $60** | **≈ $105** |
+| **Landed BOM** | **≈ $63** | **≈ $111** |
 
 Hardware usually retails at 3–5× BOM, so this lands in high-end nightstand territory ($199–349) with healthy margin.
 
@@ -106,7 +110,8 @@ Hardware usually retails at 3–5× BOM, so this lands in high-end nightstand te
 
 | Item | ≈ Cost |
 | --- | --- |
-| Extrusion die | $500–2,000 |
+| Extrusion die (only at the small-production stage; stock tube until then) | $500–2,000 |
+| CNC fixtures, soft jaws, mandrel for window machining (mostly 3D printed or shop-made) | $100–500 |
 | Custom cover-lens print setup | $300–1,000 |
 | EMC testing: FCC Part 15B + CE (EMC) + ICES-003. No radio, so no FCC ID, no RED. | $3,000–6,000 |
 | Pogo-pin test fixture | $300–800 |
@@ -138,7 +143,7 @@ Hardware usually retails at 3–5× BOM, so this lands in high-end nightstand te
   - Add or replace sounds over USB-C: the P4's USB can appear as a small drive.
   - Keep an SD footprint as do-not-populate for development.
 - **Test points** on every rail, I2C, I2S, the lamp sense resistor and the USB pins, on a 2.54 mm-friendly grid for a pogo fixture.
-- **Mounting:** the PCB screws to one end cap, so the whole electronics assembly slides into the extrusion as a unit.
+- **Mounting:** the PCB sits on a sled screwed to one end cap, so the whole electronics assembly is tested outside the case and then slides into the tube as a unit (`MANUFACTURING.md`).
 
 ### Firmware for production
 
@@ -156,10 +161,10 @@ Hardware usually retails at 3–5× BOM, so this lands in high-end nightstand te
 
 ### Enclosure
 
-- **Extrusion + two end caps** is the standard way to get a premium machined-aluminium look without paying for a full CNC body. Many high-end audio products are built this way. Use the shop-made case for V3 to prove proportions, the speaker chamber and lamp position, then translate it to extrusion + caps.
+- **Tube + two end caps** gives a premium machined-aluminium look without paying for a full CNC body. Many high-end audio products are built this way. Start with stock square tube; move to a custom extrusion only once volume justifies the die. Details, scaling stages and CNC design rules are in `MANUFACTURING.md`.
 - **Anodize after all machining.** Plan a bare-metal ground contact (masked spot or star washer) so the case can be bonded to circuit ground.
-- **Screen:** mount the panel from inside against the screen window with a gasket or VHB. Black-printed cover glass flush with the aluminium face looks high-end and hides the panel border.
-- **Tolerances:** design for the extrusion's cut-length tolerance (±0.2–0.5 mm typical) with a compressible gasket at one end cap.
+- **Screen:** hold the glass from inside against a lip in the screen window with a retaining frame and thin gasket, with no adhesive. Black-printed cover glass flush with the aluminium face looks high-end and hides the panel border.
+- **Tolerances:** design for the tube's cut-length tolerance (±0.2–0.5 mm typical) with a compressible gasket at one end cap.
 
 ### Sound library
 

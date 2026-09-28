@@ -1,6 +1,6 @@
 # Custom hardware: design notes
 
-Parts and costs are in `BOM.md`, along with notes on building this for sale.
+Start at `README.md` in this folder. Parts and costs are in `BOM.md`; enclosure and production in `MANUFACTURING.md`.
 
 Goal: take the CoreS3 alarm clock onto custom hardware in a shop-made metal case.
 
@@ -131,7 +131,7 @@ The panel's own cover glass is the touch surface. Keep it flush with or slightly
 - **Amp: MAX98357A.** I2S in, mono class-D, up to about 3 W into 4 Ω from 5 V. It runs directly off VBUS, and its SD_MODE pin lets firmware hard-mute it so there's no idle hiss.
 - **Speaker:** a 2–2.5″ full-range driver, 4 Ω. At bedside volume the speaker and its box set the quality, far more than the DAC.
 - **Enclosure (matters most in a metal case):**
-  - Sealed rear chamber of a few hundred mL, filled with polyfill or felt.
+  - Sealed rear chamber of a few hundred mL, filled with wool felt or wool batting.
   - Constrained-layer damping (butyl or bitumen mat) on large flat panels, so the case doesn't ring or buzz.
   - Gasket the speaker mount, and put a perforated grille in front with at least 30–40% open area.
 - Mono is fine for a nightstand.
