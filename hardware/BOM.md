@@ -235,7 +235,7 @@ This is the cheapest way to a working clock in a real aluminium case.
 | V2 → V3 (a) carrier → pilot of 15 | **$6,500–12,000** |
 | V2 → V3 (a) → V3 (b) custom → pilot of 15 | **$7,800–14,500** |
 
-Certification and the pilot batch are most of it. **The prototypes themselves (V2 + V3) are about $1,200–3,000.**
+Certification and the pilot batch are most of it. **The prototypes themselves are about $1,200–1,750** (V2 + carrier V3), or up to ~$4,200 if you also build the custom board.
 
 Ways to keep it down:
 - Do route (a) first. It proves the case, sound and lamp for under $1,500 before committing to the harder custom board.
