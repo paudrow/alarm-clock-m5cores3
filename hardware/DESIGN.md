@@ -1,5 +1,7 @@
 # Custom hardware: design notes
 
+Parts and costs are in `BOM.md`, along with notes on building this for sale.
+
 Goal: take the CoreS3 alarm clock onto custom hardware in a shop-made metal case.
 
 Requirements:
@@ -27,10 +29,10 @@ Requirements:
 | MCU | **ESP32-P4**. It has no radio at all, drives both small QSPI screens and large MIPI-DSI screens, and has 32 MB of in-package PSRAM (P4NRW32). For V4, Wi-Fi is added as a separate ESP32-C6, which is how Espressif's own P4 boards do it. |
 | Screen | **~4″ AMOLED + capacitive touch over MIPI-DSI.** The reference part is LilyGO's 4.1″ 1232×568 AMOLED (RM69A10 driver, GT9895 touch) on the T-Display-P4. |
 | Firmware display stack | Draw into an off-screen canvas, then hand the frame to ESP-IDF's `esp_lcd` panel driver. The panel driver is the only per-screen code. |
-| Sounds | White/pink/brown noise generated live; fire pit, rain, etc. as long recordings on a microSD card. |
+| Sounds | White/pink/brown noise generated live; fire pit, rain, etc. as long recordings, on a microSD card in V2 and onboard SPI NAND in production. |
 | Audio out | I2S amp (MAX98357A) + a good 2–2.5″ full-range driver in a sealed, damped chamber. |
 | Red lamp | 660 nm LEDs on a linear constant-current sink with an analog set-point, so no PWM and zero flicker. |
-| Timekeeping | High-accuracy RTC (RV-3028-C7, ±1 ppm at 25 °C) with a backup cell. Manual set and drift trim in the UI, DST rules in firmware. |
+| Timekeeping | High-accuracy RTC (RV-3028-C7, ±1 ppm at 25 °C) backed by a supercap (no battery to ship or replace). Manual set and drift trim in the UI, DST rules in firmware. |
 | Power | USB-C, 5 V / 3 A. The same port flashes the board. |
 
 ## Timekeeping without Wi-Fi
@@ -117,7 +119,7 @@ The panel's own cover glass is the touch surface. Keep it flush with or slightly
 
   A couple of EQ bands (a low shelf for "deeper" or "brighter") give a tone control.
 - **Fire pit, rain, ocean, fan, etc.: recordings.** Procedural fire (rumble plus random filtered crackles) is possible, but good recordings sound better. So:
-  - Store them on a **microSD card**. A 60-minute mono recording is ~60 MB as MP3/Opus or ~150–200 MB as FLAC, which a card handles easily, and you can add sounds without reflashing.
+  - In V2, store them on a **microSD card**. A 60-minute mono recording is ~60 MB as MP3/Opus or ~150–200 MB as FLAC, and you can add sounds without reflashing. For production, use 128 MB of onboard SPI NAND loaded over USB-C instead (see `BOM.md`).
   - Use long recordings (30–60 min) so the loop point isn't noticeable, and crossfade a few seconds across it.
   - Sources: CC0 recordings on freesound.org, or your own recorded at an actual fire pit.
   - Decoding MP3/FLAC on the P4 is light work (ESP-ADF, or the arduino-audio-tools library if staying on Arduino).
@@ -205,7 +207,7 @@ The panel's own cover glass is the touch surface. Keep it flush with or slightly
    - **(a) Carrier PCB:** the T-Display-P4 bolts in as brain + screen. Your PCB has USB-C power, the amp, the lamp driver and the RTC. Lowest risk.
    - **(b) Fully custom PCB:** P4 + bare AMOLED panel on its FPC. Only if you can get the panel's datasheet and a reliable supply. The 2-lane DSI pairs need 100 Ω differential routing (4-layer impedance-controlled stackup; standard at JLCPCB/PCBWay).
 
-   Design the case around the chosen board: speaker chamber and lamp diffuser first, cosmetics last.
+   Design the case around the chosen board: speaker chamber and lamp diffuser first, cosmetics last. The shop-made case proves the proportions; production moves to an aluminium extrusion + two end caps (see `BOM.md`).
 4. **V4 (optional):** ESP32-C6 for NTP time sync, and a LiPo + power-path charger so the alarm rings during outages.
 
 ## Still open
