@@ -272,22 +272,25 @@ def build(v: Variant):
 
 
 # Metadata for the viewer and report ------------------------------------------
+# label, material, look in the viewer, and where the part moves (mm, CAD axes)
+# in the fully exploded view. The body lifts straight up so the inside shows;
+# everything else moves out along the direction it is assembled.
 PART_INFO = {
-    "tube": ("Body", "6063-T52 square tube, black anodized", "alu_black", [0, 0, 0]),
-    "cap_left": ("End cap (button side)", "6061 bar, black anodized", "alu_black", [-1, 0, 0]),
-    "cap_right": ("End cap (USB-C side)", "6061 bar, black anodized", "alu_black", [1, 0, 0]),
-    "button": ("Snooze / stop button", "6061, black anodized", "alu_black", [-1.6, 0, 0]),
-    "glass_base": ("Glass base", '1/2" low-iron glass, sandblasted underside', "glass", [0, 0, -1]),
-    "screen": ("Screen module", "AMOLED panel + board", "screen", [0, -1.4, 0]),
-    "screen_frame": ("Screen retaining frame", "5052 aluminium", "alu_raw", [0, -0.8, 0.2]),
-    "sled": ("Sled", "5052 sheet", "alu_raw", [0, 0, -0.3]),
-    "pcb": ("Carrier PCB", "FR-4, matte black", "pcb", [0, 0.3, 0.15]),
-    "standoffs": ("Standoffs", "M3 aluminium", "alu_raw", [0, 0.3, -0.05]),
-    "usb_c": ("USB-C receptacle", "", "steel", [0.7, 0.3, 0.15]),
-    "leds": ("660 nm LEDs", "OSRAM OSCONIQ P 3030", "led", [0, 0.3, 0.05]),
-    "chamber": ("Speaker chamber", "5052 sheet", "alu_raw", [0, 0.9, 0.5]),
-    "speaker": ("Speaker", "Tectonic TEBM35C10-4", "speaker", [0, 1.6, 0.5]),
-    "feet": ("Cork feet", "natural cork", "cork", [0, 0, -1.3]),
+    "tube": ("Body", "6063-T52 square tube, black anodized", "alu_black", [0, 0, 110]),
+    "cap_left": ("End cap, button side", "6061 bar, black anodized", "alu_black", [-75, 0, 0]),
+    "cap_right": ("End cap, USB-C side", "6061 bar, black anodized", "alu_black", [75, 0, 0]),
+    "button": ("Snooze / stop button", "6061, black anodized", "alu_black", [-105, 0, 0]),
+    "glass_base": ("Glass base", '1/2" low-iron glass, sandblasted underside', "glass", [0, 0, -45]),
+    "screen": ("Screen module", "AMOLED panel + board", "screen", [0, -95, 0]),
+    "screen_frame": ("Screen retaining frame", "5052 aluminium", "alu_raw", [0, -55, 0]),
+    "sled": ("Sled", "5052 sheet", "alu_raw", [0, 0, -22]),
+    "pcb": ("Carrier PCB", "FR-4, matte black", "pcb", [0, 0, 0]),
+    "standoffs": ("Standoffs", "M3 aluminium", "alu_raw", [0, 0, -10]),
+    "usb_c": ("USB-C receptacle", "", "steel", [0, 0, 6]),
+    "leds": ("660 nm LEDs", "OSRAM OSCONIQ P 3030", "led", [0, 0, -12]),
+    "chamber": ("Speaker chamber", "5052 sheet", "alu_raw", [0, 40, 38]),
+    "speaker": ("Speaker", "Tectonic TEBM35C10-4", "speaker", [0, 95, 38]),
+    "feet": ("Cork feet", "natural cork", "cork", [0, 0, -62]),
 }
 DENSITY = {"alu_black": 2.70, "alu_raw": 2.70, "glass": 2.50, "cork": 0.24}
 

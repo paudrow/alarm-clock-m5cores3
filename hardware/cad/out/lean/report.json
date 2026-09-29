@@ -72,7 +72,7 @@
       "explode": [
         0,
         0,
-        0
+        110
       ],
       "volume_mm3": 87549.2,
       "mass_g": 236.4,
@@ -83,11 +83,11 @@
       ]
     },
     "cap_left": {
-      "label": "End cap (button side)",
+      "label": "End cap, button side",
       "material": "6061 bar, black anodized",
       "look": "alu_black",
       "explode": [
-        -1,
+        -75,
         0,
         0
       ],
@@ -100,11 +100,11 @@
       ]
     },
     "cap_right": {
-      "label": "End cap (USB-C side)",
+      "label": "End cap, USB-C side",
       "material": "6061 bar, black anodized",
       "look": "alu_black",
       "explode": [
-        1,
+        75,
         0,
         0
       ],
@@ -121,7 +121,7 @@
       "material": "6061, black anodized",
       "look": "alu_black",
       "explode": [
-        -1.6,
+        -105,
         0,
         0
       ],
@@ -140,7 +140,7 @@
       "explode": [
         0,
         0,
-        -1
+        -45
       ],
       "volume_mm3": 103485.8,
       "mass_g": 258.7,
@@ -156,7 +156,7 @@
       "look": "screen",
       "explode": [
         0,
-        -1.4,
+        -95,
         0
       ],
       "volume_mm3": 31680.0,
@@ -173,8 +173,8 @@
       "look": "alu_raw",
       "explode": [
         0,
-        -0.8,
-        0.2
+        -55,
+        0
       ],
       "volume_mm3": 2496.0,
       "mass_g": 6.7,
@@ -191,7 +191,7 @@
       "explode": [
         0,
         0,
-        -0.3
+        -22
       ],
       "volume_mm3": 10027.2,
       "mass_g": 27.1,
@@ -207,8 +207,8 @@
       "look": "pcb",
       "explode": [
         0,
-        0.3,
-        0.15
+        0,
+        0
       ],
       "volume_mm3": 8352.0,
       "mass_g": null,
@@ -224,8 +224,8 @@
       "look": "alu_raw",
       "explode": [
         0,
-        0.3,
-        -0.05
+        0,
+        -10
       ],
       "volume_mm3": 392.7,
       "mass_g": 1.1,
@@ -240,9 +240,9 @@
       "material": "",
       "look": "steel",
       "explode": [
-        0.7,
-        0.3,
-        0.15
+        0,
+        0,
+        6
       ],
       "volume_mm3": 216.0,
       "mass_g": null,
@@ -258,8 +258,8 @@
       "look": "led",
       "explode": [
         0,
-        0.3,
-        0.05
+        0,
+        -12
       ],
       "volume_mm3": 21.6,
       "mass_g": null,
@@ -275,8 +275,8 @@
       "look": "alu_raw",
       "explode": [
         0,
-        0.9,
-        0.5
+        40,
+        38
       ],
       "volume_mm3": 13857.2,
       "mass_g": 37.4,
@@ -292,8 +292,8 @@
       "look": "speaker",
       "explode": [
         0,
-        1.6,
-        0.5
+        95,
+        38
       ],
       "volume_mm3": 28313.3,
       "mass_g": null,
@@ -310,7 +310,7 @@
       "explode": [
         0,
         0,
-        -1.3
+        -62
       ],
       "volume_mm3": 181.0,
       "mass_g": 0.0,
