@@ -1,15 +1,18 @@
 {
   "variant": {
     "key": "full",
-    "label": "4.1\" AMOLED (T-Display-P4)",
+    "label": "V3 enclosure, 4.1\" AMOLED (T-Display-P4)",
     "screen_w": 103.8,
     "screen_h": 51.3,
     "screen_d": 12.3,
     "active_w": 94.5,
     "active_h": 43.6,
     "screen_measured": true,
-    "tube_len": 130.0
+    "tube_len": 130.0,
+    "kind": "enclosure",
+    "version": "V3"
   },
+  "kind": "enclosure",
   "geometry": {
     "overall_w": 142.7,
     "overall_h": 92.49999999999999,
@@ -57,6 +60,24 @@
       123.0,
       33.025,
       53.74999999999999
+    ],
+    "screen_node": "screen",
+    "screen_tilt": 0.0,
+    "glass_center": [
+      0,
+      0
+    ],
+    "glass_node": "glass_base",
+    "led_node": "leds",
+    "view_target": [
+      0,
+      0,
+      46
+    ],
+    "cutaway": [
+      "tube",
+      "cap_left",
+      "button"
     ]
   },
   "notes": {
@@ -80,7 +101,9 @@
         130.0,
         76.2,
         76.2
-      ]
+      ],
+      "printable": false,
+      "print_g": null
     },
     "cap_left": {
       "label": "End cap, button side",
@@ -97,7 +120,9 @@
         9.35,
         76.2,
         90.9
-      ]
+      ],
+      "printable": false,
+      "print_g": null
     },
     "cap_right": {
       "label": "End cap, USB-C side",
@@ -114,7 +139,9 @@
         9.35,
         76.2,
         90.9
-      ]
+      ],
+      "printable": false,
+      "print_g": null
     },
     "button": {
       "label": "Snooze / stop button",
@@ -131,7 +158,9 @@
         4.2,
         10.0,
         10.0
-      ]
+      ],
+      "printable": false,
+      "print_g": null
     },
     "glass_base": {
       "label": "Glass base",
@@ -148,7 +177,9 @@
         132.0,
         76.2,
         12.7
-      ]
+      ],
+      "printable": false,
+      "print_g": null
     },
     "screen": {
       "label": "Screen module",
@@ -165,7 +196,9 @@
         103.8,
         12.3,
         51.3
-      ]
+      ],
+      "printable": false,
+      "print_g": null
     },
     "screen_frame": {
       "label": "Screen retaining frame",
@@ -182,7 +215,9 @@
         107.8,
         2.0,
         55.3
-      ]
+      ],
+      "printable": false,
+      "print_g": null
     },
     "sled": {
       "label": "Sled",
@@ -199,7 +234,9 @@
         123.0,
         67.85,
         1.6
-      ]
+      ],
+      "printable": false,
+      "print_g": null
     },
     "pcb": {
       "label": "Carrier PCB",
@@ -216,7 +253,9 @@
         125.0,
         50.9,
         1.6
-      ]
+      ],
+      "printable": false,
+      "print_g": null
     },
     "standoffs": {
       "label": "Standoffs",
@@ -233,7 +272,9 @@
         118.0,
         47.9,
         5.0
-      ]
+      ],
+      "printable": false,
+      "print_g": null
     },
     "usb_c": {
       "label": "USB-C receptacle",
@@ -250,7 +291,9 @@
         7.5,
         9.0,
         3.2
-      ]
+      ],
+      "printable": false,
+      "print_g": null
     },
     "leds": {
       "label": "660 nm LEDs",
@@ -267,7 +310,9 @@
         63.0,
         3.0,
         0.6
-      ]
+      ],
+      "printable": false,
+      "print_g": null
     },
     "chamber": {
       "label": "Speaker chamber",
@@ -284,7 +329,9 @@
         123.0,
         34.62,
         55.35
-      ]
+      ],
+      "printable": false,
+      "print_g": null
     },
     "speaker": {
       "label": "Speaker",
@@ -301,7 +348,9 @@
         52.0,
         25.1,
         52.0
-      ]
+      ],
+      "printable": false,
+      "print_g": null
     },
     "feet": {
       "label": "Cork feet",
@@ -318,7 +367,9 @@
         142.35,
         60.0,
         1.6
-      ]
+      ],
+      "printable": false,
+      "print_g": null
     }
   }
 }

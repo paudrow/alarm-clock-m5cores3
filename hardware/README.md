@@ -61,6 +61,7 @@ Plans for taking the CoreS3 alarm clock (V1, the firmware in this repo) to custo
    - A `Board` layer so the app isn't tied to M5Stack's library.
 2. **V2:**
    - Buy the breadboard list in `BOM.md` (section 1, about $270). Budgets for the later stages are in `BOM.md` section 4.
+   - Print the seven holders in `cad/out/bench/` (display stand, breadboard tray, speaker test box, lamp cradle; see `cad/README.md`).
    - Measure flicker.
    - Check readability at 10 ft.
    - Pick the speaker.

@@ -38,11 +38,17 @@ class Variant:
     active_h: float
     screen_measured: bool
     tube_len: float
+    kind: str = "enclosure"     # "enclosure" (V3) or "bench" (V2 breadboard)
+    version: str = "V3"
 
 
 VARIANTS = [
-    Variant("full", '4.1" AMOLED (T-Display-P4)', 103.8, 51.3, 12.3, 94.5, 43.6, True, 130.0),
-    Variant("lean", '2.41" AMOLED (Waveshare, estimated outline)', 60.0, 48.0, 11.0, 49.0, 36.8, False, 105.0),
+    # V2: the whole T-Display-P4 in LilyGO's own shell (62.6 x 111.2 x 22.4 mm,
+    # measured from their model), on a printed stand, with the other modules.
+    Variant("bench", "V2 breadboard with printed holders", 111.2, 62.6, 22.4, 94.5, 43.6, True, 0.0,
+            kind="bench", version="V2"),
+    Variant("full", 'V3 enclosure, 4.1" AMOLED (T-Display-P4)', 103.8, 51.3, 12.3, 94.5, 43.6, True, 130.0),
+    Variant("lean", 'V3 enclosure, 2.41" AMOLED (Waveshare, estimated outline)', 60.0, 48.0, 11.0, 49.0, 36.8, False, 105.0),
 ]
 
 # Stock and fixed dimensions ---------------------------------------------------
@@ -103,6 +109,10 @@ def cyl_z(cx, cy, d, z0, z1):
 
 
 def build(v: Variant):
+    return build_bench(v) if v.kind == "bench" else build_enclosure(v)
+
+
+def build_enclosure(v: Variant):
     L = v.tube_len
     parts = {}
     notes = {}
@@ -267,6 +277,154 @@ def build(v: Variant):
         glass=[gl, TUBE_OD, GLASS_T], tube_len=L, cap_blank=[TUBE_OD, cap_h, CAP_T],
         speaker_center=[0, fl_y1, spk_cz], lamp_slot=[lamp_len, 6.0, lamp_y],
         chamber_box=[2 * inner_x, Y_IN_BACK - 0.3 - (bulk_y0 + SHEET), Z_IN_TOP - 0.3 - chamber_floor_z1],
+        screen_node="screen", screen_tilt=0.0, glass_center=[0, 0], glass_node="glass_base", led_node="leds",
+        view_target=[0, 0, 46], cutaway=["tube", "cap_left", "button"],
+    )
+    return parts, geo, notes
+
+
+# V2 breadboard layout with 3D-printable holders --------------------------------
+BB_L, BB_W, BB_H = 165.1, 54.6, 8.5   # Adafruit 239 full-size breadboard
+TILT = 15.0                           # display leans back like a clock
+LAMP_Y = -12.0                        # lamp line, same offset as the enclosure
+LED_GAP = 9.7                         # LED face to glass top, same as the enclosure
+
+
+def build_bench(v: Variant):
+    parts, notes = {}, {}
+
+    # Breadboard tray (print) with finger notches at the ends
+    tray = box(-87.5, 87.5, -32, 32, 0, 5).edges("|Z").fillet(3)
+    tray = tray.cut(box(-BB_L / 2 - 0.3, BB_L / 2 + 0.3, -BB_W / 2 - 0.3, BB_W / 2 + 0.3, 3, 6))
+    tray = tray.cut(cyl_z(-87.5, 0, 22, 3, 6)).cut(cyl_z(87.5, 0, 22, 3, 6))
+    parts["bb_tray"] = tray
+    bb_top = 3 + BB_H
+    parts["breadboard"] = box(-BB_L / 2, BB_L / 2, -BB_W / 2, BB_W / 2, 3, bb_top)
+
+    # Modules on the breadboard (boards sit on their headers, ~2.5 mm up)
+    zb = bb_top + 2.5
+    parts["amp"] = box(-68, -49, -9, 9, zb, zb + 1.6)
+    parts["light_sensor"] = box(-40, -14.6, -8.9, 8.9, zb, zb + 1.6)
+    parts["rtc"] = box(-8, 22, -10, 10, zb, zb + 1.6)
+    parts["opamp"] = box(30, 39.8, -3.2, 3.2, bb_top, bb_top + 3.3)
+    fet_z = bb_top + 3
+    fet = box(48, 58.2, -2.3, 2.3, fet_z, fet_z + 9.2).union(box(48, 58.2, 1.0, 2.3, fet_z + 9.2, fet_z + 15.9))
+    parts["mosfet"] = fet.cut(cyl_y(53.1, fet_z + 12.6, 3.6, 0.5, 3))
+    parts["mosfet_small"] = cyl_z(68, 0, 4.8, fet_z, fet_z + 5)
+
+    # Display stand (print) and the T-Display-P4 leaning back on it
+    W, H, T = v.screen_w, v.screen_h, v.screen_d
+    th = math.radians(TILT)
+    y0, base_top = 52.0, 4.0
+    dz = base_top + 0.3 + T * math.sin(th)
+
+    def place(wp):
+        return wp.rotate((0, 0, 0), (1, 0, 0), -TILT).translate((0, y0, dz))
+
+    parts["tdisplay"] = place(box(-W / 2, W / 2, 0, T, 0, H).edges("|Y").fillet(4))
+    back = box(-45, 45, T + 0.4, T + 4.4, -14, H * 0.75)
+    back = back.cut(box(-15, 15, T, T + 6, -20, 14))  # cable notch
+    back = place(back).intersect(box(-70, 70, 0, 250, base_top - 0.01, 250))
+    bby = back.val().BoundingBox()
+    base = box(-62.5, 62.5, y0 - 7, bby.ymax + 3, 0, base_top).edges("|Z").fillet(3)
+    lip = box(-50, 50, y0 - 5, y0 - 0.3, base_top - 0.01, dz + 6)
+    parts["display_stand"] = base.union(lip).union(back)
+    s_local = (0.0, -0.05, H / 2)
+    screen_center = [0.0,
+                     y0 + s_local[1] * math.cos(th) + s_local[2] * math.sin(th),
+                     dz - s_local[1] * math.sin(th) + s_local[2] * math.cos(th)]
+
+    # Sealed speaker test box (print): same air volume as the enclosure chamber
+    SBX, SBY = 170.0, 20.0
+    iw, ih, idp, wt, wf = 70.0, 60.0, 52.0, 3.0, 5.0
+    bx0, bx1 = SBX - iw / 2 - wt, SBX + iw / 2 + wt
+    by0 = SBY - idp / 2 - wf          # outside of the front baffle
+    by1 = by0 + wf + idp              # open back, closed by the lid
+    scz = wt + ih / 2
+    body = box(bx0, bx1, by0, by1, 0, ih + 2 * wt).edges("|Y").fillet(3)
+    cavity = box(SBX - iw / 2, SBX + iw / 2, by0 + wf, by1 + 1, wt, wt + ih)
+    body = body.cut(cavity)
+    bosses = None
+    boss_pts = []
+    for sx in (-1, 1):
+        for sz in (-1, 1):
+            cx, cz = SBX + sx * (iw / 2 - 3.5), scz + sz * (ih / 2 - 3.5)
+            boss_pts.append((cx, cz))
+            b = box(cx - 3.5, cx + 3.5, by0 + wf - 0.01, by1, cz - 3.5, cz + 3.5)
+            bosses = b if bosses is None else bosses.union(b)
+    body = body.union(bosses)
+    for cx, cz in boss_pts:
+        body = body.cut(cyl_y(cx, cz, 2.5, by1 - 12, by1 + 1))          # M3 pilot holes for the lid
+    body = body.cut(cyl_y(SBX, scz, 46.0, by0 - 1, by0 + wf + 1))       # speaker opening
+    body = body.cut(cyl_y(SBX, scz, SPK_OD + 0.6, by0 - 1, by0 + 2.5))  # flush recess for the flange
+    ring_holes = [(SBX + 29 * math.cos(math.radians(a)), scz + 29 * math.sin(math.radians(a))) for a in (45, 135, 225, 315)]
+    for px, pz in ring_holes:
+        body = body.cut(cyl_y(px, pz, 2.5, by0 - 1, by0 + 4))
+    body = body.cut(cyl_x(by0 + wf + 10, 10, 4.0, bx1 - wt - 1, bx1 + 1))  # speaker wire hole
+    parts["spk_box"] = body
+
+    spk = cyl_y(SBX, scz, SPK_OD, by0 + 0.05, by0 + 2.5)
+    spk = spk.union(cyl_y(SBX, scz, SPK_MOTOR_D, by0 + 2.5, by0 + SPK_DEPTH))
+    spk = spk.cut(cyl_y(SBX, scz, 42, by0 - 1, by0 + 1.8))
+    parts["speaker"] = spk
+
+    ring = cyl_y(SBX, scz, 64, by0 - 3, by0 - 0.05).cut(cyl_y(SBX, scz, 47, by0 - 4, by0 + 1))
+    for px, pz in ring_holes:
+        ring = ring.cut(cyl_y(px, pz, 3.4, by0 - 4, by0 + 1))
+    parts["spk_ring"] = ring
+
+    lid = box(bx0, bx1, by1 + 0.05, by1 + 3.05, 0, ih + 2 * wt).edges("|Y").fillet(3)
+    for cx, cz in boss_pts:
+        lid = lid.cut(cyl_y(cx, cz, 3.4, by1 - 1, by1 + 4))
+    parts["spk_lid"] = lid
+
+    # Filler block: slide it in behind the speaker to match the lean build (shown beside the box)
+    fw, fh, fd = iw - 14.6, ih - 0.6, 13.5
+    parts["spk_filler"] = box(SBX - fw / 2, SBX + fw / 2, by1 + 12, by1 + 12 + fd, 0, fh).edges("|Y").fillet(1)
+
+    air = box(SBX - iw / 2, SBX + iw / 2, by0 + wf, by1, wt, wt + ih).cut(bosses).cut(spk)
+    air_l = air.val().Volume() / 1e6
+    filler_l = fw * fh * fd / 1e6
+
+    # Lamp test cradle (print): holds the real glass base, LEDs above it as in the clock
+    LCY = -115.0
+    gz0, gz1 = GLASS_FLOAT, GLASS_FLOAT + GLASS_T
+    rx_in, rx_out = 65.0, 77.0
+    led_plane = gz1 + LED_GAP + 2.0       # underside of the star boards (LED domes ~2 mm)
+    top = led_plane + 4.0
+    cradle = box(-rx_out, -rx_in, LCY - 42.1, LCY + 42.1, 0, top).union(
+        box(rx_in, rx_out, LCY - 42.1, LCY + 42.1, 0, top))
+    cradle = cradle.union(box(-rx_out, rx_out, LCY + LAMP_Y - 13, LCY + LAMP_Y + 13, led_plane, top))
+    for sx in (-1, 1):
+        g0, g1 = sorted([sx * rx_in, sx * (rx_in + GLASS_GROOVE + 0.2)])
+        cradle = cradle.cut(box(g0, g1, LCY - 50, LCY + 50, gz0 - 0.2, gz1 + 0.2))
+    for x in (-22, 22):
+        cradle = cradle.cut(cyl_z(x, LCY + LAMP_Y, 20.4, led_plane - 0.01, led_plane + 1.8))
+        cradle = cradle.cut(cyl_z(x + (6 if x > 0 else -6), LCY + LAMP_Y, 3.5, led_plane - 1, top + 1))
+    parts["lamp_cradle"] = cradle
+    gl = 2 * (rx_in + GLASS_GROOVE)
+    parts["glass_sample"] = box(-gl / 2, gl / 2, LCY - TUBE_OD / 2, LCY + TUBE_OD / 2, gz0, gz1).edges().chamfer(0.4)
+    stars = None
+    for x in (-22, 22):
+        st = cyl_z(x, LCY + LAMP_Y, 20, led_plane + 0.2, led_plane + 1.8).union(
+            cyl_z(x, LCY + LAMP_Y, 5, led_plane - 1.8, led_plane + 0.2))
+        stars = st if stars is None else stars.union(st)
+    parts["led_stars"] = stars
+
+    allbb = None
+    for shape in parts.values():
+        bb = shape.val().BoundingBox()
+        allbb = [bb.xmin, bb.xmax, bb.ymin, bb.ymax, bb.zmax] if allbb is None else [
+            min(allbb[0], bb.xmin), max(allbb[1], bb.xmax), min(allbb[2], bb.ymin), max(allbb[3], bb.ymax), max(allbb[4], bb.zmax)]
+    geo = dict(
+        overall_w=allbb[1] - allbb[0], overall_d=allbb[3] - allbb[2], overall_h=allbb[4],
+        active=[v.active_w, v.active_h], active_center=screen_center, screen_center=screen_center,
+        screen_node="tdisplay", screen_tilt=TILT, glass=[gl, TUBE_OD, GLASS_T], glass_center=[0, LCY],
+        glass_node="glass_sample", led_node="led_stars",
+        speaker_box_litres=round(air_l, 3), speaker_box_lean_litres=round(air_l - filler_l, 3),
+        led_gap=LED_GAP, tilt=TILT,
+        view_target=[(allbb[0] + allbb[1]) / 2, (allbb[2] + allbb[3]) / 2, 25], cutaway=["spk_box", "spk_lid", "lamp_cradle"],
+        chamber_litres=round(air_l, 3),
     )
     return parts, geo, notes
 
@@ -291,8 +449,28 @@ PART_INFO = {
     "chamber": ("Speaker chamber", "5052 sheet", "alu_raw", [0, 40, 38]),
     "speaker": ("Speaker", "Tectonic TEBM35C10-4", "speaker", [0, 95, 38]),
     "feet": ("Cork feet", "natural cork", "cork", [0, 0, -62]),
+    # V2 breadboard
+    "bb_tray": ("Breadboard tray", "3D print", "pla", [0, 0, 0]),
+    "breadboard": ("Breadboard", "Adafruit 239, 830 points", "breadboard", [0, 0, 25]),
+    "amp": ("Amp breakout", "Adafruit MAX98357A #3006 (outline estimated)", "board", [0, 0, 55]),
+    "light_sensor": ("Light sensor", "Adafruit VEML7700 #4162 (outline estimated)", "board", [0, 0, 55]),
+    "rtc": ("Clock chip board", "RV-3028-C7 evaluation board (outline estimated)", "board", [0, 0, 55]),
+    "opamp": ("Op-amp", "MCP6022-I/P, DIP-8", "chip", [0, 0, 45]),
+    "mosfet": ("Lamp MOSFET", "IRL540NPBF, TO-220", "chip", [0, 0, 45]),
+    "mosfet_small": ("Range MOSFET", "TN0702N3-G, TO-92", "chip", [0, 0, 45]),
+    "display_stand": ("Display stand", "3D print, holds it at 15°", "pla", [0, 0, 0]),
+    "tdisplay": ("T-Display-P4", "LilyGO, 4.1\u2033 AMOLED, in its own shell", "device", [0, -30, 75]),
+    "spk_box": ("Speaker test box", "3D print, 0.19 L sealed", "pla", [0, 0, 0]),
+    "spk_ring": ("Speaker clamp ring", "3D print, 4 \u00d7 M3 screws", "pla", [0, -35, 0]),
+    "spk_lid": ("Test box lid", "3D print, wool felt gasket, 4 \u00d7 M3", "pla", [0, 45, 0]),
+    "spk_filler": ("Volume filler", "3D print; slide in to test the lean build's 0.15 L", "pla", [0, 60, 0]),
+    "lamp_cradle": ("Lamp test cradle", "3D print, holds the glass and LEDs", "pla", [0, 0, 45]),
+    "glass_sample": ("Glass base", "\u00bd\u2033 low-iron glass, 132 \u00d7 76 mm", "glass", [0, 0, 0]),
+    "led_stars": ("660 nm LEDs", "LUXEON SP-01-D2 on star boards, \u00d7 2", "led", [0, 0, 65]),
 }
+PRINTABLE = {"bb_tray", "display_stand", "spk_box", "spk_ring", "spk_lid", "spk_filler", "lamp_cradle"}
 DENSITY = {"alu_black": 2.70, "alu_raw": 2.70, "glass": 2.50, "cork": 0.24}
+PRINT_FILL = 1.24 * 0.45    # PLA at ~45% effective fill (walls plus infill), g/cm3
 
 
 def main():
@@ -318,11 +496,13 @@ def main():
                     clashes.append({"a": a, "b": b, "mm3": round(vol, 2)})
 
         # Chamber air volume: box minus the speaker inside it
-        cb = geo["chamber_box"]
-        spk_vol = solids["speaker"].Volume()
-        chamber_l = cb[0] * cb[1] * cb[2] / 1e6 - spk_vol / 1e6
+        if "chamber_litres" in geo:
+            chamber_l = geo["chamber_litres"]
+        else:
+            cb = geo["chamber_box"]
+            chamber_l = cb[0] * cb[1] * cb[2] / 1e6 - solids["speaker"].Volume() / 1e6
 
-        report = {"variant": asdict(v), "geometry": geo, "notes": notes,
+        report = {"variant": asdict(v), "kind": v.kind, "geometry": geo, "notes": notes,
                   "clashes": clashes, "chamber_litres": round(chamber_l, 3), "parts": {}}
         asm = cq.Assembly(name=f"clock_{v.key}")
         for n in names:
@@ -335,6 +515,8 @@ def main():
                 "label": label, "material": material, "look": look, "explode": explode,
                 "volume_mm3": round(vol, 1), "mass_g": round(mass, 1) if mass else None,
                 "bbox": [round(bb.xlen, 2), round(bb.ylen, 2), round(bb.zlen, 2)],
+                "printable": n in PRINTABLE,
+                "print_g": round(vol / 1000 * PRINT_FILL, 1) if n in PRINTABLE else None,
             }
             cq.exporters.export(shape, os.path.join(out, f"{n}.step"))
             cq.exporters.export(shape, os.path.join(out, f"{n}.stl"), tolerance=0.05, angularTolerance=0.2)
@@ -358,7 +540,7 @@ def main():
 
 
 def write_viewer():
-    """Fill the viewer template with both reports and both models."""
+    """Fill the viewer template with every variant's report and model."""
     here = os.path.dirname(os.path.abspath(__file__))
     reports, glbs = {}, {}
     viewer = os.path.join(here, "viewer")

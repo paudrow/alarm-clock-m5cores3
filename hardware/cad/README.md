@@ -4,11 +4,27 @@ A parametric model of the clock, written in Python with [CadQuery](https://cadqu
 
 | File | What it is |
 | --- | --- |
-| `clock.py` | The model. Two variants: `full` (4.1″ AMOLED, 130 mm tube) and `lean` (2.41″ AMOLED, 105 mm tube). |
+| `clock.py` | The model. Three variants: `bench` (V2 breadboard with 3D-printed holders), `full` (V3, 4.1″ AMOLED, 130 mm tube) and `lean` (V3, 2.41″ AMOLED, 105 mm tube). |
 | `out/<variant>/*.step` | One STEP per part, plus `assembly.step`. Open these in Fusion 360, FreeCAD or Onshape for CAM or further design. |
 | `out/<variant>/*.stl` | One STL per part, for 3D-printed mock-ups. Print `tube`, `cap_left`, `cap_right` and `glass_base` to judge size and proportions on the nightstand. |
 | `out/<variant>/report.json` | Sizes, masses, the collision check and the speaker-chamber volume |
-| `viewer_template.html` → `viewer/index.html` | The interactive 3D viewer, with both models embedded |
+| `viewer_template.html` → `viewer/index.html` | The interactive 3D viewer, with all three versions embedded |
+
+## V2 breadboard: parts to 3D-print
+
+`out/bench/` has STLs for seven holders. Together they make the breadboard build a tidy bench rig that tests the same things the finished clock depends on. Each fits a 180 mm bed, about 160 g of PLA or PETG in all.
+
+| STL | What it does | How to print |
+| --- | --- | --- |
+| `display_stand.stl` | Holds the T-Display-P4 (in LilyGO's shell) leaning back 15°, like the clock, with a cable notch | On its base, no supports |
+| `bb_tray.stl` | Holds the full-size breadboard, with finger notches to lift it out | Flat, no supports |
+| `spk_box.stl` | Sealed speaker test box, **0.19 L of air**, the same as the 4.1″ clock's chamber | Front face down, open back up. 4 walls so it's airtight. |
+| `spk_ring.stl` | Clamps the Tectonic speaker's flange into the box's front recess | Flat |
+| `spk_lid.stl` | Closes the back. Put a wool-felt gasket under it. | Flat |
+| `spk_filler.stl` | Slide in behind the speaker to drop the box to **0.14 L**, close to the 2.41″ clock's chamber | Flat |
+| `lamp_cradle.stl` | Holds the real ½″ glass base in end grooves, with two LED star boards **9.7 mm above the glass**, as in the clock | Upside down (bridge on the bed); the grooves print as small overhangs |
+
+Hardware: 8 × M3 × 10 mm screws, driven straight into the 2.5 mm pilot holes (4 for the lid, 4 for the ring). Seal the speaker-wire hole with putty.
 
 ## Run it
 

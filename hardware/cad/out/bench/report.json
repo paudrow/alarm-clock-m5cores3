@@ -1,0 +1,410 @@
+{
+  "variant": {
+    "key": "bench",
+    "label": "V2 breadboard with printed holders",
+    "screen_w": 111.2,
+    "screen_h": 62.6,
+    "screen_d": 22.4,
+    "active_w": 94.5,
+    "active_h": 43.6,
+    "screen_measured": true,
+    "tube_len": 0.0,
+    "kind": "bench",
+    "version": "V2"
+  },
+  "kind": "bench",
+  "geometry": {
+    "overall_w": 295.5,
+    "overall_d": 250.13836631211038,
+    "overall_h": 70.56450333599214,
+    "active": [
+      94.5,
+      43.6
+    ],
+    "active_center": [
+      0.0,
+      60.05273982039445,
+      40.34396592539943
+    ],
+    "screen_center": [
+      0.0,
+      60.05273982039445,
+      40.34396592539943
+    ],
+    "screen_node": "tdisplay",
+    "screen_tilt": 15.0,
+    "glass": [
+      132.0,
+      76.19999999999999,
+      12.7
+    ],
+    "glass_center": [
+      0,
+      -115.0
+    ],
+    "glass_node": "glass_sample",
+    "led_node": "led_stars",
+    "speaker_box_litres": 0.188,
+    "speaker_box_lean_litres": 0.143,
+    "led_gap": 9.7,
+    "tilt": 15.0,
+    "view_target": [
+      60.25,
+      -32.030816843944805,
+      25
+    ],
+    "cutaway": [
+      "spk_box",
+      "spk_lid",
+      "lamp_cradle"
+    ],
+    "chamber_litres": 0.188
+  },
+  "notes": {},
+  "clashes": [],
+  "chamber_litres": 0.188,
+  "parts": {
+    "bb_tray": {
+      "label": "Breadboard tray",
+      "material": "3D print",
+      "look": "pla",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "volume_mm3": 37271.4,
+      "mass_g": null,
+      "bbox": [
+        175.0,
+        64.0,
+        5.0
+      ],
+      "printable": true,
+      "print_g": 20.8
+    },
+    "breadboard": {
+      "label": "Breadboard",
+      "material": "Adafruit 239, 830 points",
+      "look": "breadboard",
+      "explode": [
+        0,
+        0,
+        25
+      ],
+      "volume_mm3": 76622.9,
+      "mass_g": null,
+      "bbox": [
+        165.1,
+        54.6,
+        8.5
+      ],
+      "printable": false,
+      "print_g": null
+    },
+    "amp": {
+      "label": "Amp breakout",
+      "material": "Adafruit MAX98357A #3006 (outline estimated)",
+      "look": "board",
+      "explode": [
+        0,
+        0,
+        55
+      ],
+      "volume_mm3": 547.2,
+      "mass_g": null,
+      "bbox": [
+        19.0,
+        18.0,
+        1.6
+      ],
+      "printable": false,
+      "print_g": null
+    },
+    "light_sensor": {
+      "label": "Light sensor",
+      "material": "Adafruit VEML7700 #4162 (outline estimated)",
+      "look": "board",
+      "explode": [
+        0,
+        0,
+        55
+      ],
+      "volume_mm3": 723.4,
+      "mass_g": null,
+      "bbox": [
+        25.4,
+        17.8,
+        1.6
+      ],
+      "printable": false,
+      "print_g": null
+    },
+    "rtc": {
+      "label": "Clock chip board",
+      "material": "RV-3028-C7 evaluation board (outline estimated)",
+      "look": "board",
+      "explode": [
+        0,
+        0,
+        55
+      ],
+      "volume_mm3": 960.0,
+      "mass_g": null,
+      "bbox": [
+        30.0,
+        20.0,
+        1.6
+      ],
+      "printable": false,
+      "print_g": null
+    },
+    "opamp": {
+      "label": "Op-amp",
+      "material": "MCP6022-I/P, DIP-8",
+      "look": "chip",
+      "explode": [
+        0,
+        0,
+        45
+      ],
+      "volume_mm3": 207.0,
+      "mass_g": null,
+      "bbox": [
+        9.8,
+        6.4,
+        3.3
+      ],
+      "printable": false,
+      "print_g": null
+    },
+    "mosfet": {
+      "label": "Lamp MOSFET",
+      "material": "IRL540NPBF, TO-220",
+      "look": "chip",
+      "explode": [
+        0,
+        0,
+        45
+      ],
+      "volume_mm3": 507.3,
+      "mass_g": null,
+      "bbox": [
+        10.2,
+        4.6,
+        15.9
+      ],
+      "printable": false,
+      "print_g": null
+    },
+    "mosfet_small": {
+      "label": "Range MOSFET",
+      "material": "TN0702N3-G, TO-92",
+      "look": "chip",
+      "explode": [
+        0,
+        0,
+        45
+      ],
+      "volume_mm3": 90.5,
+      "mass_g": null,
+      "bbox": [
+        4.8,
+        4.8,
+        5.0
+      ],
+      "printable": false,
+      "print_g": null
+    },
+    "tdisplay": {
+      "label": "T-Display-P4",
+      "material": "LilyGO, 4.1\u2033 AMOLED, in its own shell",
+      "look": "device",
+      "explode": [
+        0,
+        -30,
+        75
+      ],
+      "volume_mm3": 155621.4,
+      "mass_g": null,
+      "bbox": [
+        111.2,
+        37.84,
+        66.26
+      ],
+      "printable": false,
+      "print_g": null
+    },
+    "display_stand": {
+      "label": "Display stand",
+      "material": "3D print, holds it at 15\u00b0",
+      "look": "pla",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "volume_mm3": 44816.3,
+      "mass_g": null,
+      "bbox": [
+        125.0,
+        48.04,
+        49.55
+      ],
+      "printable": true,
+      "print_g": 25.0
+    },
+    "spk_box": {
+      "label": "Speaker test box",
+      "material": "3D print, 0.19 L sealed",
+      "look": "pla",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "volume_mm3": 67318.2,
+      "mass_g": null,
+      "bbox": [
+        76.0,
+        57.0,
+        66.0
+      ],
+      "printable": true,
+      "print_g": 37.6
+    },
+    "speaker": {
+      "label": "Speaker",
+      "material": "Tectonic TEBM35C10-4",
+      "look": "speaker",
+      "explode": [
+        0,
+        95,
+        38
+      ],
+      "volume_mm3": 25782.6,
+      "mass_g": null,
+      "bbox": [
+        52.0,
+        25.05,
+        52.0
+      ],
+      "printable": false,
+      "print_g": null
+    },
+    "spk_ring": {
+      "label": "Speaker clamp ring",
+      "material": "3D print, 4 \u00d7 M3 screws",
+      "look": "pla",
+      "explode": [
+        0,
+        -35,
+        0
+      ],
+      "volume_mm3": 4264.9,
+      "mass_g": null,
+      "bbox": [
+        64.0,
+        2.95,
+        64.0
+      ],
+      "printable": true,
+      "print_g": 2.4
+    },
+    "spk_lid": {
+      "label": "Test box lid",
+      "material": "3D print, wool felt gasket, 4 \u00d7 M3",
+      "look": "pla",
+      "explode": [
+        0,
+        45,
+        0
+      ],
+      "volume_mm3": 14915.9,
+      "mass_g": null,
+      "bbox": [
+        76.0,
+        3.0,
+        66.0
+      ],
+      "printable": true,
+      "print_g": 8.3
+    },
+    "spk_filler": {
+      "label": "Volume filler",
+      "material": "3D print; slide in to test the lean build's 0.15 L",
+      "look": "pla",
+      "explode": [
+        0,
+        60,
+        0
+      ],
+      "volume_mm3": 44413.7,
+      "mass_g": null,
+      "bbox": [
+        55.4,
+        13.5,
+        59.4
+      ],
+      "printable": true,
+      "print_g": 24.8
+    },
+    "lamp_cradle": {
+      "label": "Lamp test cradle",
+      "material": "3D print, holds the glass and LEDs",
+      "look": "pla",
+      "explode": [
+        0,
+        0,
+        45
+      ],
+      "volume_mm3": 70075.7,
+      "mass_g": null,
+      "bbox": [
+        154.0,
+        84.2,
+        29.9
+      ],
+      "printable": true,
+      "print_g": 39.1
+    },
+    "glass_sample": {
+      "label": "Glass base",
+      "material": "\u00bd\u2033 low-iron glass, 132 \u00d7 76 mm",
+      "look": "glass",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "volume_mm3": 127671.3,
+      "mass_g": 319.2,
+      "bbox": [
+        132.0,
+        76.2,
+        12.7
+      ],
+      "printable": false,
+      "print_g": null
+    },
+    "led_stars": {
+      "label": "660 nm LEDs",
+      "material": "LUXEON SP-01-D2 on star boards, \u00d7 2",
+      "look": "led",
+      "explode": [
+        0,
+        0,
+        65
+      ],
+      "volume_mm3": 1083.8,
+      "mass_g": null,
+      "bbox": [
+        64.0,
+        20.0,
+        3.6
+      ],
+      "printable": false,
+      "print_g": null
+    }
+  }
+}

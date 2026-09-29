@@ -102,6 +102,7 @@ tr.sub td { color: var(--muted); }
 .sw { width: 10px; height: 10px; border-radius: 2px; border: 1px solid var(--line); align-self: center; }
 .pn { font-weight: 600; font-size: 14px; }
 .pm { display: block; color: var(--muted); font-size: 12px; }
+.print-tag { font: 600 10px var(--font-data); letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); border: 1px solid currentColor; border-radius: 3px; padding: 0 4px; margin-left: 6px; vertical-align: 2px; }
 .pd { font-family: var(--font-data); font-size: 12px; color: var(--muted); text-align: right; white-space: nowrap; }
 footer { color: var(--muted); font-size: 13px; margin-top: 18px; max-width: 80ch; }
 code { font-family: var(--font-data); font-size: 12px; }
@@ -112,7 +113,7 @@ code { font-family: var(--font-data); font-size: 12px; }
   <header>
     <div>
       <h1>Alarm clock enclosure<span class="dot">.</span></h1>
-      <p class="sub">Black-anodized aluminium tube and end caps on a ½″ low-iron glass base that glows 660 nm red. Drag to orbit, scroll or pinch to zoom, hover a part to name it, and press Explode to take it apart.</p>
+      <p class="sub">From the V2 breadboard, with 3D-printed holders, to the V3 black-anodized aluminium clock on a ½″ low-iron glass base that glows 660 nm red. Drag to orbit, scroll or pinch to zoom, hover a part to name it, and press Explode to take it apart.</p>
     </div>
     <div class="dims" id="dims"></div>
   </header>
@@ -138,10 +139,11 @@ code { font-family: var(--font-data); font-size: 12px; }
 
     <div class="side">
       <section class="card" aria-labelledby="h-build">
-        <h2 id="h-build">Build</h2>
-        <div class="seg" role="group" aria-label="Screen">
-          <button type="button" id="v-full" aria-pressed="true">4.1″ AMOLED</button>
-          <button type="button" id="v-lean" aria-pressed="false">2.41″ lean</button>
+        <h2 id="h-build">Version</h2>
+        <div class="seg" role="group" aria-label="Version">
+          <button type="button" id="v-bench" data-variant="bench" aria-pressed="true">V2 breadboard</button>
+          <button type="button" id="v-full" data-variant="full" aria-pressed="false">V3 · 4.1″</button>
+          <button type="button" id="v-lean" data-variant="lean" aria-pressed="false">V3 · 2.41″</button>
         </div>
         <div class="row">
           <label for="explode">Explode</label>
@@ -170,24 +172,24 @@ code { font-family: var(--font-data); font-size: 12px; }
             <tbody id="cost-rows"></tbody>
           </table>
         </div>
-        <div class="row">
+        <div class="row batch-only">
           <label for="hours">Your hours per clock</label>
           <input type="number" id="hours" min="0" step="0.25" value="1.25" style="width:74px;font:13px var(--font-data);text-align:right;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:3px;padding:2px 4px">
         </div>
-        <div class="row">
+        <div class="row batch-only">
           <label for="rate">Your rate, $/h</label>
           <input type="number" id="rate" min="0" step="5" value="40" style="width:74px;font:13px var(--font-data);text-align:right;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:3px;padding:2px 4px">
         </div>
-        <div class="row">
+        <div class="row batch-only">
           <label for="price">Selling price</label>
           <input type="number" id="price" min="0" step="10" value="200" style="width:74px;font:13px var(--font-data);text-align:right;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:3px;padding:2px 4px">
         </div>
         <div class="totals">
-          <div><span>Cash</span><b class="big" id="t-cash"></b></div>
-          <div class="hl"><span>With your time</span><b class="big" id="t-all"></b></div>
-          <div><span>Margin each</span><b class="big" id="t-margin"></b></div>
+          <div><span id="t-cash-label">Cash</span><b class="big" id="t-cash"></b></div>
+          <div class="hl batch-only"><span>With your time</span><b class="big" id="t-all"></b></div>
+          <div class="batch-only"><span>Margin each</span><b class="big" id="t-margin"></b></div>
         </div>
-        <p class="note">Edit any price to try a real quote; your edits stay in this browser. Margin allows 3% for card fees and assumes shipping is charged to the buyer. Certification (FCC testing, $1,000–3,000 for the batch) is not included.</p>
+        <p class="note" id="cost-note">Edit any price to try a real quote; your edits stay in this browser. Margin allows 3% for card fees and assumes shipping is charged to the buyer. Certification (FCC testing, $1,000–3,000 for the batch) is not included.</p>
       </section>
 
       <section class="card" aria-labelledby="h-parts">
@@ -211,6 +213,22 @@ const REPORTS = /*REPORTS*/;
 const GLB = /*GLB*/; // base64-encoded models, one per variant
 
 const COSTS = {
+  bench: [
+    ["tdisplay", "LilyGO T-Display-P4, 4.1″ AMOLED", 119.30, "LilyGO, retail"],
+    ["rtc", "RV-3028-C7 evaluation board", 17.47, "Digi-Key"],
+    ["amp", "Adafruit MAX98357A amp #3006", 5.95, "Adafruit"],
+    ["speakers", "Speakers: Tectonic TEBM35C10-4 and Dayton ND65-4", 32.96, "Parts Express"],
+    ["leds", "660 nm LEDs: 2 star boards, 5 OSRAM 3030", 27.39, "Luxeon Star, Digi-Key"],
+    ["driver", "Lamp driver: 2 op-amps, 4 MOSFETs, sense resistors", 13.00, "Digi-Key"],
+    ["sensors", "VEML7700 light sensor, 2 BPW34 photodiodes", 7.69, "Adafruit, Digi-Key"],
+    ["power", "27 W USB-C supply and USB cable", 18.99, "Adafruit"],
+    ["proto", "Breadboard, jumpers, 4 Qwiic cables", 13.70, "Adafruit"],
+    ["sd", "32 GB microSD card", 11.99, "Amazon"],
+    ["glass", "½″ low-iron glass base, cut singly", 45, "estimate"],
+    ["filament", "PLA for the printed holders", null, "~$20/kg"],
+    ["screws", "M3 screws for the test box", 3, "estimate"],
+    ["shipping", "Shipping from about 6 vendors", 50, "estimate"]
+  ],
   full: [
     ["brain", "LilyGO T-Display-P4, 4.1″ AMOLED", 119.30, "retail price"],
     ["carrier", "Carrier PCB, assembled: USB-C power, amp, lamp driver, 4 LEDs, RTC", 18, "estimate"],
@@ -242,8 +260,8 @@ const COSTS = {
 };
 const SCRAP = 0.03;
 
-const PART_COLOUR = { tube: "#5b6b82", cap_left: "#7f8fa6", cap_right: "#7f8fa6", button: "#c4a35a", glass_base: "#9fd3c7", screen: "#2d2d33", screen_frame: "#d9a066", sled: "#b8c4a0", pcb: "#4f8a5b", standoffs: "#c9ccd1", usb_c: "#c9ccd1", leds: "#e0142c", chamber: "#a58cc9", speaker: "#d08a8a", feet: "#b58a5a" };
-const LOOK_SWATCH = { alu_black: "#1b1b1e", alu_raw: "#b9bcc0", glass: "#cfe3e0", screen: "#050505", pcb: "#16201b", steel: "#9a9da2", led: "#d0142a", speaker: "#2c2c2f", cork: "#a9825a" };
+const PART_COLOUR = { bb_tray: "#e07b39", display_stand: "#e07b39", spk_box: "#e07b39", spk_lid: "#e8955c", spk_ring: "#e8955c", spk_filler: "#f0b27f", lamp_cradle: "#e07b39", breadboard: "#efeee8", amp: "#3b5fa8", light_sensor: "#3b5fa8", rtc: "#3b8aa8", opamp: "#333338", mosfet: "#333338", mosfet_small: "#333338", tdisplay: "#44444c", glass_sample: "#9fd3c7", led_stars: "#e0142c", tube: "#5b6b82", cap_left: "#7f8fa6", cap_right: "#7f8fa6", button: "#c4a35a", glass_base: "#9fd3c7", screen: "#2d2d33", screen_frame: "#d9a066", sled: "#b8c4a0", pcb: "#4f8a5b", standoffs: "#c9ccd1", usb_c: "#c9ccd1", leds: "#e0142c", chamber: "#a58cc9", speaker: "#d08a8a", feet: "#b58a5a" };
+const LOOK_SWATCH = { pla: "#e07b39", breadboard: "#efeee8", board: "#1f3b73", chip: "#1a1a1c", device: "#2d2d33", alu_black: "#1b1b1e", alu_raw: "#b9bcc0", glass: "#cfe3e0", screen: "#050505", pcb: "#16201b", steel: "#9a9da2", led: "#d0142a", speaker: "#2c2c2f", cork: "#a9825a" };
 
 const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
@@ -270,6 +288,12 @@ function makeMaterials() {
   mats.led = new THREE.MeshStandardMaterial({ color: 0x551018, emissive: 0xff1030, emissiveIntensity: 1 });
   mats.speaker = new THREE.MeshStandardMaterial({ color: 0x2b2b2e, roughness: 0.6, metalness: 0.2 });
   mats.cork = new THREE.MeshStandardMaterial({ color: 0xa9825a, roughness: 0.95 });
+  const srgb = (hex) => new THREE.Color(hex).convertSRGBToLinear();
+  mats.pla = new THREE.MeshStandardMaterial({ color: srgb(0xe07b39), roughness: 0.75 });
+  mats.breadboard = new THREE.MeshStandardMaterial({ color: srgb(0xdedcd4), roughness: 0.8 });
+  mats.board = new THREE.MeshStandardMaterial({ color: srgb(0x1f3b73), roughness: 0.6 });
+  mats.chip = new THREE.MeshStandardMaterial({ color: srgb(0x1a1a1c), roughness: 0.5 });
+  mats.device = new THREE.MeshStandardMaterial({ color: srgb(0x2d2d33), roughness: 0.55 });
 }
 
 function digitsTexture(w, h) {
@@ -387,10 +411,11 @@ const VIEWS = {
   below: [220, -20, 300],
   exploded: [430, 290, 560]
 };
+let baseTarget = new THREE.Vector3(0, 46, 0);
 function setView(name, instant) {
   const p = VIEWS[name];
-  const dist = variant === "lean" ? 0.88 : 1;
-  const to = new THREE.Vector3(p[0] * dist, p[1] * dist, p[2] * dist);
+  const dist = variant === "lean" ? 0.88 : variant === "bench" ? 1.3 : 1;
+  const to = new THREE.Vector3(p[0] * dist + baseTarget.x, (p[1] - 46) * dist + baseTarget.y, p[2] * dist + baseTarget.z);
   if (instant || reduceMotion) { camera.position.copy(to); controls.update(); return; }
   const from = camera.position.clone(); const t0 = performance.now();
   (function step(now) {
@@ -423,7 +448,8 @@ function buildVariant(key, gltf) {
     built[name] = o;
   });
   const plane = screenImage(rep);
-  if (built.screen) built.screen.add(plane);
+  const host = built[rep.geometry.screen_node];
+  if (host) host.add(plane);
   variantCache[key] = { nodes: built, screenPlane: plane };
 }
 
@@ -436,12 +462,20 @@ function showVariant(key) {
   Object.values(nodes).forEach((o) => root.add(o));
   buildLabels();
   const g = rep.geometry;
+  const gc = g.glass_center || [0, 0];
   wash.scale.set(g.glass[0] * 1.9, g.glass[1] * 1.9, 1);
+  wash.position.set(gc[0], -1.55, -gc[1]);
+  const t = g.view_target || [0, 0, 46];
+  baseTarget = new THREE.Vector3(t[0], t[2], -t[1]);
+  shownKind = rep.kind;
   document.getElementById("loading").hidden = true;
   document.getElementById("vlabel").textContent = rep.variant.label;
   applyState();
   renderFit(rep); renderParts(rep); renderCosts(); renderDims(rep);
+  setView(+document.getElementById("explode").value > 50 ? "exploded" : "three", firstShow);
+  firstShow = false;
 }
+let shownKind = null, firstShow = true;
 
 function loadVariant(key) {
   variant = key;
@@ -470,7 +504,7 @@ function screenImage(rep) {
   const [aw, ah] = g.active;
   const plane = new THREE.Mesh(new THREE.PlaneGeometry(aw, ah),
     new THREE.MeshBasicMaterial({ map: digitsTexture(aw, ah), toneMapped: false }));
-  plane.rotation.x = Math.PI / 2; // face -Y (front) in CAD axes
+  plane.rotation.x = (90 - (g.screen_tilt || 0)) * Math.PI / 180; // face -Y (front), leaning back by the tilt
   plane.position.set(g.active_center[0], g.active_center[1] - 0.05, g.active_center[2]);
   return plane;
 }
@@ -481,36 +515,41 @@ function applyState() {
   const cut = document.getElementById("cutaway").checked;
   const scr = document.getElementById("screen").checked;
   const colour = document.getElementById("colour").checked;
+  const g = REPORTS[variant].geometry;
+  const cutSet = g.cutaway || [];
   for (const [name, o] of Object.entries(nodes)) {
     const want = colour && o.userData.info.look !== "glass" ? o.userData.diagMat : o.userData.baseMat;
     if (o.material !== want) o.material = want;
     o.userData.edges.visible = colour;
     const v = o.userData.info.explode;
     o.position.set(v[0] * ex, v[1] * ex, v[2] * ex);
-    const see = cut && (name === "tube" || name === "cap_left" || name === "button");
+    const see = cut && cutSet.includes(name);
     o.material.transparent = see || o.userData.info.look === "glass";
     o.material.opacity = see ? 0.14 : 1;
     o.material.depthWrite = !see;
     o.castShadow = !see && o.userData.info.look !== "glass";
   }
-  if (nodes.glass_base) {
-    nodes.glass_base.material.emissive.setHex(lamp ? 0xb00018 : 0x000000);
-    nodes.glass_base.material.emissiveIntensity = lamp ? 1.0 : 0;
+  const glassNode = nodes[g.glass_node], ledNode = nodes[g.led_node];
+  if (glassNode) {
+    glassNode.material.emissive.setHex(lamp ? 0xb00018 : 0x000000);
+    glassNode.material.emissiveIntensity = lamp ? 1.0 : 0;
   }
-  if (nodes.leds) nodes.leds.material.emissiveIntensity = lamp ? 1.4 : 0;
+  if (ledNode && ledNode.material.emissive) { ledNode.material.emissive.setHex(0xff1030); ledNode.material.emissiveIntensity = lamp ? 1.4 : 0; }
+  const gc = g.glass_center || [0, 0];
   lampLight.intensity = lamp ? 1.6 : 0;
-  lampLight.position.y = 8 + (nodes.glass_base ? nodes.glass_base.position.z : 0);
+  lampLight.position.set(gc[0], 8 + (glassNode ? glassNode.position.z : 0), -gc[1]);
   wash.visible = lamp && ex < 0.05;
   if (screenPlane) screenPlane.visible = scr;
-  controls.target.y = 46 + 22 * ex;
+  controls.target.set(baseTarget.x, baseTarget.y + (variant === "bench" ? 30 : 22) * ex, baseTarget.z);
   const btn = document.getElementById("explode-btn");
   btn.textContent = ex > 0.5 ? "Assemble" : "Explode";
   btn.setAttribute("aria-pressed", ex > 0.5);
 }
 
 // Exploded-view labels, placed on each part's centre every frame
-const SHORT = { tube: "Body (lifts off)", cap_left: "End cap", cap_right: "End cap + USB-C", glass_base: "Glass base", screen: "Screen", screen_frame: "Frame", sled: "Sled", pcb: "PCB", chamber: "Chamber", speaker: "Speaker", button: "Button" };
-const LABELED = ["tube", "cap_left", "cap_right", "glass_base", "screen", "screen_frame", "sled", "pcb", "chamber", "speaker", "button"];
+const SHORT = { bb_tray: "Tray (print)", display_stand: "Stand (print)", spk_box: "Test box (print)", spk_lid: "Lid (print)", spk_ring: "Clamp ring (print)", spk_filler: "Filler (print)", lamp_cradle: "Lamp cradle (print)", breadboard: "Breadboard", tdisplay: "T-Display-P4", amp: "Amp", light_sensor: "Light sensor", rtc: "Clock chip", mosfet: "MOSFET", glass_sample: "Glass base", led_stars: "LEDs", tube: "Body (lifts off)", cap_left: "End cap", cap_right: "End cap + USB-C", glass_base: "Glass base", screen: "Screen", screen_frame: "Frame", sled: "Sled", pcb: "PCB", chamber: "Chamber", speaker: "Speaker", button: "Button" };
+const LABELED = ["tube", "cap_left", "cap_right", "glass_base", "screen", "screen_frame", "sled", "pcb", "chamber", "speaker", "button",
+  "bb_tray", "display_stand", "spk_box", "spk_lid", "spk_ring", "spk_filler", "lamp_cradle", "breadboard", "tdisplay", "glass_sample", "led_stars"];
 let labelEls = {};
 function buildLabels() {
   const layer = document.getElementById("labels");
@@ -595,6 +634,10 @@ const inch = (mm) => mm / 25.4;
 
 function renderDims(rep) {
   const g = rep.geometry;
+  if (rep.kind === "bench") {
+    document.getElementById("dims").textContent = `Bench layout ${fmt(g.overall_w, 0)} × ${fmt(g.overall_d, 0)} mm  ·  ${fmt(inch(g.overall_w), 1)} × ${fmt(inch(g.overall_d), 1)} in`;
+    return;
+  }
   document.getElementById("dims").textContent =
     `${fmt(g.overall_w, 1)} × ${fmt(g.overall_h, 1)} × ${fmt(g.overall_d, 1)} mm  ·  ${fmt(inch(g.overall_w), 2)} × ${fmt(inch(g.overall_h), 2)} × ${fmt(inch(g.overall_d), 2)} in`;
 }
@@ -614,6 +657,7 @@ function renderFit(rep) {
     ? `<span class="pill bad">${clash} clash${clash > 1 ? "es" : ""}</span> ${rep.clashes.map((c) => `${c.a} × ${c.b}`).join(", ")}`
     : `<span class="pill ok">No clashes</span> ${n} parts, ${pairs} pairs checked`;
   const g = rep.geometry;
+  if (rep.kind === "bench") { renderBenchFit(rep); return; }
   const mass = Object.values(rep.parts).reduce((s, p) => s + (p.mass_g || 0), 0) + (variant === "full" ? 60 : 35) + 45;
   const [d4, d3] = digitHeight(g);
   const kv = [
@@ -632,11 +676,33 @@ function renderFit(rep) {
     : "Every part pair was intersected in CAD. The 2.41″ board outline is estimated, so re-run the check once its drawing is confirmed. Readable at 10 ft wants digits of about 25 mm (1″) or more.";
 }
 
+function renderBenchFit(rep) {
+  const g = rep.geometry;
+  const printed = Object.values(rep.parts).filter((p) => p.printable);
+  const grams = printed.reduce((s, p) => s + p.print_g, 0);
+  const biggest = printed.slice().sort((a, b) => b.bbox[0] * b.bbox[1] - a.bbox[0] * a.bbox[1])[0];
+  const [d4] = digitHeight(g);
+  const kv = [
+    ["Bench footprint", `${fmt(g.overall_w, 0)} × ${fmt(g.overall_d, 0)} mm`],
+    ["Printed parts", `${printed.length}, about ${fmt(grams, 0)} g of PLA`],
+    ["Largest print", `${biggest.label}, ${biggest.bbox.map((x) => fmt(x, 0)).join(" × ")} mm`],
+    ["Speaker test box", `${fmt(g.speaker_box_litres, 2)} L, ${fmt(g.speaker_box_lean_litres, 2)} L with filler`],
+    ["LEDs above glass", `${fmt(g.led_gap, 1)} mm, as in the clock`],
+    ["Display tilt", `${fmt(g.tilt, 0)}°`],
+    ["Digit height, 12:34", `${fmt(d4, 0)} mm (${fmt(inch(d4), 2)}″)`]
+  ];
+  document.getElementById("fit-kv").innerHTML = kv.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
+  document.getElementById("fit-note").textContent =
+    "Every part pair was intersected in CAD. Every print fits a 180 mm bed. The stand is sized from the T-Display-P4's shell measured from LilyGO's model; outlines marked estimated don't affect the prints.";
+}
+
 function renderParts(rep) {
   const ul = document.getElementById("parts");
   ul.innerHTML = Object.entries(rep.parts).map(([k, p]) => {
     const b = p.bbox.map((x) => fmt(x, 1)).join(" × ");
-    return `<li data-part="${k}"><span class="sw" style="background:${LOOK_SWATCH[p.look]}"></span><span><span class="pn">${p.label}</span><span class="pm">${p.material || "&nbsp;"}</span></span><span class="pd">${b} mm${p.mass_g ? `<br>${fmt(p.mass_g, 0)} g` : ""}</span></li>`;
+    const tag = p.printable ? `<span class="print-tag">Print</span>` : "";
+    const wt = p.printable ? `<br>${fmt(p.print_g, 0)} g PLA` : p.mass_g ? `<br>${fmt(p.mass_g, 0)} g` : "";
+    return `<li data-part="${k}"><span class="sw" style="background:${LOOK_SWATCH[p.look]}"></span><span><span class="pn">${p.label}</span>${tag}<span class="pm">${p.material || "&nbsp;"}</span></span><span class="pd">${b} mm${wt}</span></li>`;
   }).join("");
   ul.querySelectorAll("li").forEach((li) => li.addEventListener("click", () => flash(li.dataset.part)));
 }
@@ -647,6 +713,7 @@ function costRows() {
   return COSTS[variant].map(([id, label, price, src]) => {
     let p = price;
     if (id === "tube") p = +(inch(rep.geometry.tube_len + 3) * 1.53).toFixed(2);
+    if (id === "filament") p = +(Object.values(rep.parts).reduce((s, q) => s + (q.print_g || 0), 0) * 0.02).toFixed(2);
     if (saved[id] != null) p = saved[id];
     return { id, label, price: p, src };
   });
@@ -654,11 +721,18 @@ function costRows() {
 
 function renderCosts() {
   const rows = costRows();
+  const bench = REPORTS[variant].kind === "bench";
+  document.getElementById("h-cost").textContent = bench ? "Cost of the breadboard build" : "Cost per clock, batch of 10";
+  document.querySelectorAll(".batch-only").forEach((el) => { el.hidden = bench; });
+  document.getElementById("t-cash-label").textContent = bench ? "Total, one build" : "Cash";
+  document.getElementById("cost-note").textContent = bench
+    ? "One of everything on the breadboard list in BOM.md, plus the glass, filament and shipping. Edit any price; your edits stay in this browser."
+    : "Edit any price to try a real quote; your edits stay in this browser. Margin allows 3% for card fees and assumes shipping is charged to the buyer. Certification (FCC testing, $1,000–3,000 for the batch) is not included.";
   document.getElementById("cost-rows").innerHTML = rows.map((r) =>
     `<tr><td>${r.label}<span class="src">${r.src}</span></td><td class="num"><input type="number" min="0" step="0.5" id="c-${r.id}" data-id="${r.id}" value="${r.price}" aria-label="${r.label}, dollars each"></td></tr>`
   ).join("") +
-    `<tr class="sub"><td>Scrap allowance, 3%</td><td class="num" id="c-scrap"></td></tr>` +
-    `<tr class="total"><td>Cash per clock</td><td class="num" id="c-total"></td></tr>`;
+    `<tr class="sub"${bench ? " hidden" : ""}><td>Scrap allowance, 3%</td><td class="num" id="c-scrap"></td></tr>` +
+    `<tr class="total"><td>${bench ? "Total" : "Cash per clock"}</td><td class="num" id="c-total"></td></tr>`;
   document.querySelectorAll("#cost-rows input").forEach((inp) => inp.addEventListener("input", () => {
     const saved = store.get(`costs-${variant}`, {});
     saved[inp.dataset.id] = +inp.value || 0; store.set(`costs-${variant}`, saved);
@@ -670,7 +744,7 @@ function renderCosts() {
 function updateTotals() {
   const vals = [...document.querySelectorAll("#cost-rows input")].map((i) => +i.value || 0);
   const sub = vals.reduce((a, b) => a + b, 0);
-  const scrap = sub * SCRAP;
+  const scrap = REPORTS[variant].kind === "bench" ? 0 : sub * SCRAP;
   const cash = sub + scrap;
   const hours = +document.getElementById("hours").value || 0;
   const rate = +document.getElementById("rate").value || 0;
@@ -693,18 +767,18 @@ function updateTotals() {
 });
 ["explode", "lamp", "cutaway", "screen", "colour"].forEach((id) => document.getElementById(id).addEventListener("input", applyState));
 document.querySelectorAll("[data-view]").forEach((b) => b.addEventListener("click", () => setView(b.dataset.view)));
+const variantButtons = [...document.querySelectorAll("[data-variant]")];
+function markVariant(key) { variantButtons.forEach((b) => b.setAttribute("aria-pressed", b.dataset.variant === key)); }
 function pickVariant(key) {
-  document.getElementById("v-full").setAttribute("aria-pressed", key === "full");
-  document.getElementById("v-lean").setAttribute("aria-pressed", key === "lean");
+  markVariant(key);
   store.set("variant", key);
   loadVariant(key);
 }
-document.getElementById("v-full").addEventListener("click", () => pickVariant("full"));
-document.getElementById("v-lean").addEventListener("click", () => pickVariant("lean"));
+variantButtons.forEach((b) => b.addEventListener("click", () => pickVariant(b.dataset.variant)));
 
 init();
-const startVariant = store.get("variant", "full");
-document.getElementById("v-full").setAttribute("aria-pressed", startVariant === "full");
-document.getElementById("v-lean").setAttribute("aria-pressed", startVariant === "lean");
+let startVariant = store.get("variant", "bench");
+if (!REPORTS[startVariant]) startVariant = "bench";
+markVariant(startVariant);
 if (document.fonts) document.fonts.ready.then(() => loadVariant(startVariant)); else loadVariant(startVariant);
 </script>
