@@ -8,8 +8,9 @@ A parametric model of the clock, written in Python with [CadQuery](https://cadqu
 | `out/<variant>/*.step` | One STEP per part, plus `assembly.step`. Open these in Fusion 360, FreeCAD or Onshape for CAM or further design. |
 | `out/<variant>/*.stl` | One STL per part, for 3D-printed mock-ups. Print `tube`, `cap_left`, `cap_right` and `glass_base` to judge size and proportions on the nightstand. |
 | `out/<variant>/report.json` | Sizes, masses, the collision check and the speaker-chamber volume |
-| `viewer_template.html` → `viewer/index.html` | The interactive 3D viewer, with all three versions embedded |
-| `site/` | The same viewer as a standalone site for alarmclock.audrow.com (Cloudflare Workers); see `site/README.md` to deploy |
+| `viewer.py` | Builds the 3D viewer page and the website from `out/`. Needs only standard Python, not CadQuery. |
+| `viewer_template.html` | The viewer's source. `viewer.py` turns it into `viewer/index.html` (for the Claude artifact) and `site/public/` (for the website); both are generated and not committed. |
+| `site/` | Cloudflare Workers config for alarmclock.audrow.com; see `site/README.md` to deploy |
 
 ## V2 breadboard: parts to 3D-print
 
@@ -31,7 +32,8 @@ Hardware: 8 × M3 × 10 mm screws, driven straight into the 2.5 mm pilot holes (
 
 ```sh
 pip install cadquery trimesh
-python clock.py
+python clock.py        # rebuild the model, then the viewer and site
+python viewer.py       # or: just rebuild the viewer and site from out/ (no CadQuery needed)
 ```
 
 Each run:
