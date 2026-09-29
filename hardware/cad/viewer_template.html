@@ -215,6 +215,7 @@ code { font-family: var(--font-data); font-size: 12px; }
       <section class="card" aria-labelledby="h-parts">
         <h2 id="h-parts">Parts</h2>
         <p class="dl-all" id="dl-all"></p>
+        <p class="dl-all" id="dl-status" role="status" hidden></p>
         <ul class="parts-list" id="parts"></ul>
       </section>
     </div>
@@ -229,6 +230,8 @@ code { font-family: var(--font-data); font-size: 12px; }
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/environments/RoomEnvironment.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/STLExporter.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script>
 const REPORTS = /*REPORTS*/;
 const GLB = /*GLB*/; // base64-encoded models, one per variant
@@ -400,6 +403,54 @@ function buyForPart(key, part) {
 
 // Downloads are served by the standalone site; the Claude viewer blocks downloads, so link there.
 const SITE = "https://alarmclock.audrow.com";
+
+// Inside the Claude viewer, the downloads capability saves files the page builds itself.
+// It accepts zip but not STL, so each STL is built from the model and saved zipped.
+let downloadsApi = null;
+if (window.claude && typeof window.claude.use === "function") {
+  window.claude.use("downloads").then((d) => { downloadsApi = d; }).catch(() => {});
+}
+const PRINT_NOTES = `Alarm clock V2 breadboard: 3D-printed holders
+All parts fit a 180 mm bed. Units are millimetres. PLA or PETG, about 160 g in all.
+
+display_stand  Holds the T-Display-P4 leaning back 15 degrees. Print on its base, no supports.
+bb_tray        Holds the full-size breadboard. Print flat, no supports.
+spk_box        Sealed speaker test box, 0.19 L of air. Front face down, open back up; 4 walls so it's airtight.
+spk_ring       Clamps the speaker flange into the front recess. Print flat.
+spk_lid        Closes the back; put a wool-felt gasket under it. Print flat.
+spk_filler     Slide in behind the speaker to drop the box to 0.14 L. Print flat.
+lamp_cradle    Holds the 1/2 inch glass base with the LED stars 9.7 mm above it. Print upside down, bridge on the bed.
+
+Hardware: 8 x M3 x 10 mm screws into the 2.5 mm pilot holes (4 lid, 4 ring). Seal the speaker-wire hole with putty.
+Measure your T-Display-P4 before printing the stand.
+`;
+function stlBytes(name) {
+  const mesh = new THREE.Mesh(nodes[name].geometry); // identity transform: CAD millimetres, Z up
+  mesh.updateMatrixWorld(true);
+  const view = new THREE.STLExporter().parse(mesh, { binary: true });
+  return new Uint8Array(view.buffer, view.byteOffset, view.byteLength);
+}
+function setStatus(text) {
+  const el = document.getElementById("dl-status");
+  el.textContent = text || ""; el.hidden = !text;
+}
+async function saveStlZip(filename, names, notes) {
+  if (!downloadsApi || typeof JSZip === "undefined") return false;
+  const zip = new JSZip();
+  for (const n of names) zip.file(`${n}.stl`, stlBytes(n));
+  if (notes) zip.file("README.txt", notes);
+  const blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE" });
+  try {
+    await downloadsApi.save({ filename, data: blob });
+    setStatus(`Saved ${filename}.`);
+  } catch (err) {
+    const code = err && err.code;
+    if (code === "declined") setStatus("");
+    else if (code === "rate_limited") setStatus("A save is already waiting for your answer. Finish that one first.");
+    else setStatus(`Opening the download on ${SITE.replace("https://", "")} instead.`), window.open(SITE + "/files/" + variant + "/" + (names.length > 1 ? `${variant}-prints.zip` : `${names[0]}.stl`), "_blank", "noopener");
+  }
+  return true;
+}
 const fileBase = () => (location.hostname === "alarmclock.audrow.com" ? "" : SITE + "/") + "files/";
 
 
@@ -852,22 +903,30 @@ function renderParts(rep) {
   const base = fileBase() + variant + "/";
   const printed = Object.values(rep.parts).filter((p) => p.printable).length;
   document.getElementById("dl-all").innerHTML =
-    (printed ? `<a href="${base}${variant}-prints.zip">Download all ${printed} printable STLs (zip)</a> · ` : "") +
+    (printed ? `<a href="${base}${variant}-prints.zip" data-prints="1">Download all ${printed} printable STLs (zip)</a> · ` : "") +
     `<a href="${base}${variant}-all-parts.zip">All parts, STL + STEP (zip)</a>`;
   const ul = document.getElementById("parts");
   ul.innerHTML = Object.entries(rep.parts).map(([k, p]) => {
     const b = p.bbox.map((x) => fmt(x, 1)).join(" × ");
-    const tag = p.printable ? `<a class="print-tag" href="${base}${k}.stl" download title="Download the STL to print">Print ↓ STL</a>` : "";
+    const tag = p.printable ? `<a class="print-tag" href="${base}${k}.stl" data-stl="${k}" title="Download the STL to print">Print ↓ STL</a>` : "";
     const wt = p.printable ? `<br>${fmt(p.print_g, 0)} g PLA` : p.mass_g ? `<br>${fmt(p.mass_g, 0)} g` : "";
     const buy = buyForPart(variant, k);
     const links = [
       buy ? `<a href="${esc(buy.url)}" target="_blank" rel="noopener">Buy ↗</a>` : "",
-      `<a href="${base}${k}.stl"${p.printable ? ' style="font-weight:600"' : ""}>STL</a>`,
+      `<a href="${base}${k}.stl" data-stl="${k}"${p.printable ? ' style="font-weight:600"' : ""}>STL</a>`,
       `<a href="${base}${k}.step">STEP</a>`
     ].filter(Boolean).join("");
     return `<li data-part="${k}"><span class="sw" style="background:${LOOK_SWATCH[p.look]}"></span><span><span class="pn">${p.label}</span>${tag}<span class="pm">${p.material || "&nbsp;"}</span><span class="links">${links}</span></span><span class="pd">${b} mm${wt}</span></li>`;
   }).join("");
   ul.querySelectorAll("a").forEach((a) => a.addEventListener("click", (e) => e.stopPropagation()));
+  document.querySelectorAll("#parts a[data-stl], #dl-all a[data-prints]").forEach((a) => a.addEventListener("click", (e) => {
+    if (!downloadsApi) return; // no in-page saving here: follow the link to the site's file
+    e.preventDefault();
+    const names = a.dataset.prints ? Object.keys(rep.parts).filter((n) => rep.parts[n].printable) : [a.dataset.stl];
+    const filename = a.dataset.prints ? `alarm-clock-${variant}-prints.zip` : `${a.dataset.stl}-stl.zip`;
+    saveStlZip(filename, names, a.dataset.prints ? PRINT_NOTES : null);
+  }));
+  setStatus("");
   ul.querySelectorAll("li").forEach((li) => li.addEventListener("click", () => flash(li.dataset.part)));
 }
 
