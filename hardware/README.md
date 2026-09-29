@@ -8,7 +8,7 @@ Plans for taking the CoreS3 alarm clock (V1, the firmware in this repo) to custo
 | [`BOM.md`](BOM.md) | Bill of materials for the V2 breadboard and for production (~1k units), one-time costs, and design-for-manufacture notes |
 | [`FIRST-BATCH.md`](FIRST-BATCH.md) | A lean plan for a first run of 10 at ~$200: display options, cost per unit, pricing and how not to go broke |
 | [`CERTIFICATION.md`](CERTIFICATION.md) | What's needed to sell it legally in the US, Canada, EU and UK, what it costs, and how to pass first time |
-| [`cad/`](cad/README.md) | Parametric CAD model (CadQuery): STEP/STL for every part, fit checks, and a 3D viewer |
+| [`cad/`](cad/README.md) | Parametric CAD model (CadQuery): STEP/STL for every part, fit checks, and a 3D viewer whose touchscreen runs the real firmware ([`../sim/`](../sim/README.md)) |
 | [`MANUFACTURING.md`](MANUFACTURING.md) | Enclosure construction, getting rid of plastics, finish, CNC design rules, uses for the 3D printer, assembly sequence, and how production scales |
 
 ## Requirements
