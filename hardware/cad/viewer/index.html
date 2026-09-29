@@ -102,7 +102,21 @@ tr.sub td { color: var(--muted); }
 .sw { width: 10px; height: 10px; border-radius: 2px; border: 1px solid var(--line); align-self: center; }
 .pn { font-weight: 600; font-size: 14px; }
 .pm { display: block; color: var(--muted); font-size: 12px; }
-.print-tag { font: 600 10px var(--font-data); letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); border: 1px solid currentColor; border-radius: 3px; padding: 0 4px; margin-left: 6px; vertical-align: 2px; }
+.print-tag { text-decoration: none; font: 600 10px var(--font-data); letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); border: 1px solid currentColor; border-radius: 3px; padding: 0 4px; margin-left: 6px; vertical-align: 2px; }
+.links { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 3px; font: 500 12px var(--font-data); }
+.links a, .buy-group a, .dl-all a { color: var(--accent); text-decoration: none; border-bottom: 1px solid transparent; }
+.links a:hover, .buy-group a:hover, .dl-all a:hover { border-bottom-color: currentColor; }
+.dl-all { margin: 0 0 8px; font-size: 13px; color: var(--muted); }
+.dl-all a { font-weight: 600; }
+.buy-group { margin-top: 10px; }
+.buy-group:first-child { margin-top: 0; }
+.buy-group h3 { font-size: 13px; font-weight: 800; margin: 0 0 2px; display: flex; justify-content: space-between; gap: 8px; }
+.buy-group h3 span { font: 500 12px var(--font-data); color: var(--muted); }
+.buy-group ul { list-style: none; margin: 0; padding: 0; }
+.buy-group li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; padding: 5px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+.buy-group li:last-child { border-bottom: none; }
+.buy-group .sku { display: block; color: var(--muted); font: 11px var(--font-data); }
+.buy-group .pr { font: 12px var(--font-data); text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .pd { font-family: var(--font-data); font-size: 12px; color: var(--muted); text-align: right; white-space: nowrap; }
 footer { color: var(--muted); font-size: 13px; margin-top: 18px; max-width: 80ch; }
 code { font-family: var(--font-data); font-size: 12px; }
@@ -192,8 +206,15 @@ code { font-family: var(--font-data); font-size: 12px; }
         <p class="note" id="cost-note">Edit any price to try a real quote; your edits stay in this browser. Margin allows 3% for card fees and assumes shipping is charged to the buyer. Certification (FCC testing, $1,000–3,000 for the batch) is not included.</p>
       </section>
 
+      <section class="card" aria-labelledby="h-buy">
+        <h2 id="h-buy">Where to buy</h2>
+        <div id="buy"></div>
+        <p class="note">Links open the store's product page. Prices are from search results and were not checked in a cart; confirm before ordering.</p>
+      </section>
+
       <section class="card" aria-labelledby="h-parts">
         <h2 id="h-parts">Parts</h2>
+        <p class="dl-all" id="dl-all"></p>
         <ul class="parts-list" id="parts"></ul>
       </section>
     </div>
@@ -259,6 +280,128 @@ const COSTS = {
   ]
 };
 const SCRAP = 0.03;
+
+// Where to buy. `part` ties an item to a part in the model so its row can link to it.
+const DK = (path) => `https://www.digikey.com/en/products/detail/${path}`;
+const LCSC = (c) => `https://www.lcsc.com/product-detail/${c}.html`;
+const MATERIALS = [
+  { store: "Metal", items: [
+    { name: "6063-T52 square tube, 3″ × ⅛″ wall", sku: "Speedy Metals pc-4685 · $1.53/in", url: "https://www.speedymetals.com/pc-4685-8379-3-sq-wall-sq-tube-6063-t52-aluminum.aspx", part: "tube" },
+    { name: "6061-T6511 flat bar, ¼″ × 3″ (end caps, button)", sku: "Speedy Metals p-2249", url: "https://www.speedymetals.com/p-2249-14-x-3-6061-t6511-aluminum-extruded.aspx", part: ["cap_left", "cap_right", "button"] },
+    { name: "5052-H32 sheet, 0.063″ (sled, chamber, frame)", sku: "OnlineMetals pid 7128", url: "https://www.onlinemetals.com/en/buy/aluminum/0-063-aluminum-sheet-5052-h32/pid/7128", part: ["sled", "chamber", "screen_frame"] }
+  ]},
+  { store: "Glass", items: [
+    { name: "½″ low-iron glass, 132 × 76 mm, flat polished edges", sku: "Dulles Glass, custom size", price: "quote", url: "https://www.dullesglass.com/low-iron-glass", part: ["glass_base", "glass_sample"] }
+  ]},
+  { store: "Hardware", items: [
+    { name: "M3 × 8 mm socket cap screws, stainless", sku: "Bolt Depot 6379", url: "https://boltdepot.com/Product-Details?product=6379" },
+    { name: "M3 × 6 mm button head screws, stainless", sku: "Bolt Depot 7218", url: "https://boltdepot.com/Product-Details?product=7218" },
+    { name: "E-Z Coil thread inserts, M3 × 1D (tube wall)", sku: "E-Z LOK SK40210", url: "https://www.ezlok.com/ezcoil-kit-SK40210" },
+    { name: "Recoil thread inserts, M3 × 1.5D (end caps)", sku: "Recoil 35038", url: "https://www.baysupply.com/products/35038-recoil" },
+    { name: "M3 × 10 mm aluminium standoffs, male-female", sku: "RAF M2105-3005-AL", price: "$0.52", url: DK("raf-electronic-hardware/M2105-3005-AL/7681378"), part: "standoffs" }
+  ]},
+  { store: "Acoustic and finishing", items: [
+    { name: "F-1 wool felt, 1/16″, black", sku: "The Felt Company", url: "https://www.thefeltcompany.com/f-1-sae-wool-felt-1-16-thick-x-60-wide-black-industrial-wool-felt/" },
+    { name: "Lambswool speaker stuffing, 500 g", sku: "KJF Audio", price: "$16", url: "https://kjfaudio.com/product/lambs-wool-speaker-stuffing-500g/" },
+    { name: "Buna-N O-ring cord, 2 mm", sku: "The O-Ring Store N70.079", url: "https://www.theoringstore.com/store/index.php?main_page=product_info&products_id=18589" },
+    { name: "Self-adhesive cork sheet, 1/16″", sku: "Rockler", url: "https://www.rockler.com/pressure-sensitive-cork-sheets", part: "feet" },
+    { name: "Dynamat Xtreme speaker kit", sku: "Dynamat 10415", price: "$25.95", url: "https://dynamat.com/products/dynamat-xtreme-speaker-kit" }
+  ]},
+  { store: "Black anodizing (mail-in)", items: [
+    { name: "Diamond Metal Finishing, no strict minimum", sku: "Houston, TX", price: "quote", url: "https://www.diamondmf.com/small-parts-anodizing/" },
+    { name: "DMF Anodizing", sku: "$125 lot minimum", price: "quote", url: "https://dmfanodizing.com/" },
+    { name: "Quick Turn Anodizing", sku: "Indiana / Tennessee", price: "quote", url: "https://www.quickturnanodizing.net/" }
+  ]},
+  { store: "CNC tooling", items: [
+    { name: "¼″ 3-flute carbide end mill, ZrN", sku: "Maritool p12766", url: "https://www.maritool.com/p12766/1/4-3-Flute-Carbide-End-Mill-SE-38-Deg-Helix-.500-loc-ZrN-Coated/product_info.html" },
+    { name: "⅛″ 3-flute carbide end mill, ZrN", sku: "Maritool p13495", url: "https://www.maritool.com/Cutting-Tools-End-Mills-Finishers-Square-End-Aluminum-Specific-End-Mills-Square-End-3-Flute/c78_79_80_201_202/p13495/1/8-3-Flute-Carbide-End-Mill-SE-38-Deg-Helix-.375-loc-ZrN-Coated/product_info.html" },
+    { name: "¼″ 90° chamfer mill", sku: "Maritool p17650", url: "https://www.maritool.com/Cutting-Tools-End-Mills-Chamfer-Mills-Long-Length-Chamfer-Mills/c78_79_154_427/p17650/Chamfer-Mill-.250-Dia-X-90-Degree-x-3.0-OAL-4-Flute-DE/product_info.html" }
+  ]}
+];
+const CARRIER = { store: "Carrier PCB parts (LCSC, for JLCPCB assembly)", items: [
+  { name: "MAX98357A I2S amp", sku: "LCSC C910544", price: "$0.82", url: LCSC("C910544") },
+  { name: "RV-3028-C7 real-time clock", sku: "LCSC C3019759", url: LCSC("C3019759") },
+  { name: "0.1 F supercap, 5.5 V (RTC backup)", sku: "KAMCAP SE-5R5-D104VY, LCSC C150567", url: LCSC("C150567") },
+  { name: "SY8089AAAC 3.3 V buck", sku: "LCSC C78988", url: LCSC("C78988") },
+  { name: "USB-C receptacle, 16-pin", sku: "HRO TYPE-C-31-M-12, LCSC C165948", url: LCSC("C165948"), part: "usb_c" },
+  { name: "USBLC6-2SC6 USB ESD", sku: "LCSC C7519", url: LCSC("C7519") },
+  { name: "SMF5.0A VBUS TVS", sku: "LCSC C151296", url: LCSC("C151296") },
+  { name: "2 A resettable fuse, 1812", sku: "Littelfuse MINISMDC200F-2, LCSC C720175", url: LCSC("C720175") },
+  { name: "MCP6001 op-amp (lamp driver)", sku: "LCSC C116490", url: LCSC("C116490") },
+  { name: "AO3400A MOSFETs (lamp driver)", sku: "LCSC C20917", url: LCSC("C20917") },
+  { name: "LTR-303ALS light sensor", sku: "LCSC C364577", url: LCSC("C364577") },
+  { name: "JST-PH 2-pin speaker connector", sku: "LCSC C295747", url: LCSC("C295747") },
+  { name: "660 nm LEDs, OSCONIQ P 3030 (× 4)", sku: "GH QSSPA1.24-4T2U-1-FJ-350-R18", price: "$1.73", url: DK("ams-osram-usa-inc/GH-QSSPA1-24-4T2U-1-FJ-350-R18/10483574"), part: "leds" },
+  { name: "PCB fabrication and assembly", sku: "JLCPCB", price: "quote", url: "https://jlcpcb.com/", part: "pcb" }
+]};
+const SPEAKER = { name: "Tectonic TEBM35C10-4 2″ speaker", sku: "Parts Express 297-216", price: "$9.98", url: "https://www.parts-express.com/Tectonic-TEBM35C10-4-BMR-2-Full-Range-Speaker-4-Ohm-297-216", part: "speaker" };
+const BUY = {
+  bench: [
+    { store: "LilyGO", items: [
+      { name: "T-Display-P4, 4.1″ AMOLED variant", sku: "Also on Amazon: B0GTLC4D9H", price: "$119.30", url: "https://lilygo.cc/products/t-display-p4", part: "tdisplay" }
+    ]},
+    { store: "Luxeon Star", items: [
+      { name: "Deep-red 655 nm LED on 20 mm star (× 2)", sku: "SP-01-D2 · built to order", price: "$9.37", url: "https://luxeonstar.com/product/sp-01-d2/", part: "led_stars" }
+    ]},
+    { store: "Digi-Key", items: [
+      { name: "RV-3028-C7 evaluation board", sku: "2195-RV-3028-C7-EVALUATION-BOARD-ND", price: "$17.47", url: DK("micro-crystal-ag/RV-3028-C7-EVALUATION-BOARD/10431075"), part: "rtc" },
+      { name: "MCP6022-I/P dual op-amp (× 2)", sku: "MCP6022-I/P", price: "$1.86", url: DK("microchip-technology/MCP6022-I-P/417828"), part: "opamp" },
+      { name: "IRL540NPBF MOSFET, TO-220 (× 2)", sku: "IRL540NPBF", price: "$2.39", url: DK("infineon-technologies/IRL540NPBF/812000"), part: "mosfet" },
+      { name: "TN0702N3-G MOSFET, TO-92 (× 2)", sku: "TN0702N3-G-ND", price: "$1.52", url: DK("microchip-technology/TN0702N3-G/4902376"), part: "mosfet_small" },
+      { name: "2 Ω 1 W resistor (× 5)", sku: "RSMF1JB2R00", url: DK("stackpole-electronics-inc/RSMF1JB2R00/1686644") },
+      { name: "200 Ω ¼ W resistor (× 10)", sku: "RNF14FTD200R", price: "$0.10", url: DK("stackpole-electronics-inc/RNF14FTD200R/1706701") },
+      { name: "BPW34 photodiode (× 2), for flicker tests", sku: "751-1015-ND", price: "$1.37", url: DK("vishay-semiconductor-opto-division/BPW34/1681149") },
+      { name: "Optional: OSRAM 660 nm 3030 LEDs (× 5)", sku: "GH QSSPA1.24-4T2U-1-FJ-350-R18", price: "$1.73", url: DK("ams-osram-usa-inc/GH-QSSPA1-24-4T2U-1-FJ-350-R18/10483574") }
+    ]},
+    { store: "Adafruit", items: [
+      { name: "MAX98357A I2S amp breakout", sku: "3006", price: "$5.95", url: "https://www.adafruit.com/product/3006", part: "amp" },
+      { name: "VEML7700 light sensor, STEMMA QT", sku: "4162", price: "$4.95", url: "https://www.adafruit.com/product/4162", part: "light_sensor" },
+      { name: "Raspberry Pi 27 W USB-C power supply", sku: "5814", price: "$14.04", url: "https://www.adafruit.com/product/5814" },
+      { name: "USB A to C cable, 1 m", sku: "4474", price: "$4.95", url: "https://www.adafruit.com/product/4474" },
+      { name: "Full-size breadboard", sku: "239", price: "$5.95", url: "https://www.adafruit.com/product/239", part: "breadboard" },
+      { name: "Male-male jumper wires, 40 × 6″", sku: "758", price: "$3.95", url: "https://www.adafruit.com/product/758" },
+      { name: "STEMMA QT / Qwiic to header cable (× 4)", sku: "4209", price: "$0.95", url: "https://www.adafruit.com/product/4209" }
+    ]},
+    { store: "Parts Express", items: [
+      SPEAKER,
+      { name: "Optional: Dayton Audio ND65-4 2.5″ speaker, to compare", sku: "290-204", price: "$22.98", url: "https://www.parts-express.com/Dayton-Audio-ND65-4-2-1-2-Aluminum-Cone-Full-Range-Driver-290-204" }
+    ]},
+    { store: "Amazon", items: [
+      { name: "Samsung PRO Endurance 32 GB microSD", sku: "MB-MJ32KA/AM", price: "~$12", url: "https://www.amazon.com/dp/B09WB35BXS" }
+    ]},
+    { store: "For the printed holders", items: [
+      { name: "½″ low-iron glass, 132 × 76 mm, flat polished edges", sku: "Dulles Glass, custom size", price: "quote", url: "https://www.dullesglass.com/low-iron-glass", part: "glass_sample" },
+      { name: "M3 × 10 mm stainless screws (× 8)", sku: "Bolt Depot, M3 socket caps", url: "https://boltdepot.com/Metric_socket_cap_Stainless_steel_18-8_(A-2)_3mm_x_0.5mm" },
+      { name: "Wool felt, for the test-box lid gasket", sku: "The Felt Company", url: "https://www.thefeltcompany.com/f-1-sae-wool-felt-1-16-thick-x-60-wide-black-industrial-wool-felt/" }
+    ]}
+  ],
+  full: [
+    { store: "Brain and screen", items: [
+      { name: "LilyGO T-Display-P4, 4.1″ AMOLED variant", sku: "Screen module used inside the case", price: "$119.30", url: "https://lilygo.cc/products/t-display-p4", part: "screen" }
+    ]},
+    { store: "Speaker", items: [SPEAKER] },
+    CARRIER, ...MATERIALS
+  ],
+  lean: [
+    { store: "Brain and screen", items: [
+      { name: "Waveshare ESP32-S3-Touch-AMOLED-2.41", sku: "Also on Amazon: B0DZ6SK5W8", price: "~$40", url: "https://www.waveshare.com/esp32-s3-touch-amoled-2.41.htm", part: "screen" }
+    ]},
+    { store: "Speaker", items: [SPEAKER] },
+    CARRIER, ...MATERIALS
+  ]
+};
+function buyForPart(key, part) {
+  for (const g of BUY[key]) for (const it of g.items) {
+    const ps = Array.isArray(it.part) ? it.part : [it.part];
+    if (ps.includes(part)) return it;
+  }
+  return null;
+}
+
+// Downloads are served by the standalone site; the Claude viewer blocks downloads, so link there.
+const SITE = "https://alarmclock.audrow.com";
+const fileBase = () => (location.hostname === "alarmclock.audrow.com" ? "" : SITE + "/") + "files/";
+
 
 const PART_COLOUR = { bb_tray: "#e07b39", display_stand: "#e07b39", spk_box: "#e07b39", spk_lid: "#e8955c", spk_ring: "#e8955c", spk_filler: "#f0b27f", lamp_cradle: "#e07b39", breadboard: "#efeee8", amp: "#3b5fa8", light_sensor: "#3b5fa8", rtc: "#3b8aa8", opamp: "#333338", mosfet: "#333338", mosfet_small: "#333338", tdisplay: "#44444c", glass_sample: "#9fd3c7", led_stars: "#e0142c", tube: "#5b6b82", cap_left: "#7f8fa6", cap_right: "#7f8fa6", button: "#c4a35a", glass_base: "#9fd3c7", screen: "#2d2d33", screen_frame: "#d9a066", sled: "#b8c4a0", pcb: "#4f8a5b", standoffs: "#c9ccd1", usb_c: "#c9ccd1", leds: "#e0142c", chamber: "#a58cc9", speaker: "#d08a8a", feet: "#b58a5a" };
 const LOOK_SWATCH = { pla: "#e07b39", breadboard: "#efeee8", board: "#1f3b73", chip: "#1a1a1c", device: "#2d2d33", alu_black: "#1b1b1e", alu_raw: "#b9bcc0", glass: "#cfe3e0", screen: "#050505", pcb: "#16201b", steel: "#9a9da2", led: "#d0142a", speaker: "#2c2c2f", cork: "#a9825a" };
@@ -696,14 +839,35 @@ function renderBenchFit(rep) {
     "Every part pair was intersected in CAD. Every print fits a 180 mm bed. The stand is sized from the T-Display-P4's shell measured from LilyGO's model; outlines marked estimated don't affect the prints.";
 }
 
+const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+function renderBuy() {
+  document.getElementById("buy").innerHTML = BUY[variant].map((g) =>
+    `<div class="buy-group"><h3>${esc(g.store)}</h3><ul>` + g.items.map((it) =>
+      `<li><span><a href="${esc(it.url)}" target="_blank" rel="noopener">${esc(it.name)}</a><span class="sku">${esc(it.sku || "")}</span></span><span class="pr">${esc(it.price || "")}</span></li>`
+    ).join("") + `</ul></div>`).join("");
+}
+
 function renderParts(rep) {
+  renderBuy();
+  const base = fileBase() + variant + "/";
+  const printed = Object.values(rep.parts).filter((p) => p.printable).length;
+  document.getElementById("dl-all").innerHTML =
+    (printed ? `<a href="${base}${variant}-prints.zip">Download all ${printed} printable STLs (zip)</a> · ` : "") +
+    `<a href="${base}${variant}-all-parts.zip">All parts, STL + STEP (zip)</a>`;
   const ul = document.getElementById("parts");
   ul.innerHTML = Object.entries(rep.parts).map(([k, p]) => {
     const b = p.bbox.map((x) => fmt(x, 1)).join(" × ");
-    const tag = p.printable ? `<span class="print-tag">Print</span>` : "";
+    const tag = p.printable ? `<a class="print-tag" href="${base}${k}.stl" download title="Download the STL to print">Print ↓ STL</a>` : "";
     const wt = p.printable ? `<br>${fmt(p.print_g, 0)} g PLA` : p.mass_g ? `<br>${fmt(p.mass_g, 0)} g` : "";
-    return `<li data-part="${k}"><span class="sw" style="background:${LOOK_SWATCH[p.look]}"></span><span><span class="pn">${p.label}</span>${tag}<span class="pm">${p.material || "&nbsp;"}</span></span><span class="pd">${b} mm${wt}</span></li>`;
+    const buy = buyForPart(variant, k);
+    const links = [
+      buy ? `<a href="${esc(buy.url)}" target="_blank" rel="noopener">Buy ↗</a>` : "",
+      `<a href="${base}${k}.stl"${p.printable ? ' style="font-weight:600"' : ""}>STL</a>`,
+      `<a href="${base}${k}.step">STEP</a>`
+    ].filter(Boolean).join("");
+    return `<li data-part="${k}"><span class="sw" style="background:${LOOK_SWATCH[p.look]}"></span><span><span class="pn">${p.label}</span>${tag}<span class="pm">${p.material || "&nbsp;"}</span><span class="links">${links}</span></span><span class="pd">${b} mm${wt}</span></li>`;
   }).join("");
+  ul.querySelectorAll("a").forEach((a) => a.addEventListener("click", (e) => e.stopPropagation()));
   ul.querySelectorAll("li").forEach((li) => li.addEventListener("click", () => flash(li.dataset.part)));
 }
 

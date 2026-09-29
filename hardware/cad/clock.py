@@ -16,6 +16,8 @@ Run with CadQuery installed:  python clock.py
 import json
 import math
 import base64
+import shutil
+import zipfile
 import os
 from dataclasses import dataclass, asdict
 
@@ -555,6 +557,24 @@ def write_viewer():
                 .replace("/*GLB*/", json.dumps(glbs)))
     with open(os.path.join(viewer, "index.html"), "w") as f:
         f.write(html)
+
+    # Part files for download from the site: one STL and STEP per part, plus zips
+    for v in VARIANTS:
+        src = os.path.join(here, "out", v.key)
+        dst = os.path.join(here, "site", "public", "files", v.key)
+        os.makedirs(dst, exist_ok=True)
+        rep = reports[v.key]
+        with zipfile.ZipFile(os.path.join(dst, f"{v.key}-all-parts.zip"), "w", zipfile.ZIP_DEFLATED) as allz:
+            for n in rep["parts"]:
+                for ext in ("stl", "step"):
+                    shutil.copy(os.path.join(src, f"{n}.{ext}"), os.path.join(dst, f"{n}.{ext}"))
+                    allz.write(os.path.join(src, f"{n}.{ext}"), f"{v.key}/{n}.{ext}")
+        printable = [n for n, p in rep["parts"].items() if p.get("printable")]
+        if printable:
+            with zipfile.ZipFile(os.path.join(dst, f"{v.key}-prints.zip"), "w", zipfile.ZIP_DEFLATED) as pz:
+                for n in printable:
+                    pz.write(os.path.join(src, f"{n}.stl"), f"{n}.stl")
+                pz.write(os.path.join(here, "README.md"), "README.md")
 
     # The same page as a standalone site (Cloudflare Workers static assets; see site/README.md)
     head_end = html.index("</style>") + len("</style>")
