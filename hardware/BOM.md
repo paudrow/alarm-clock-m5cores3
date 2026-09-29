@@ -83,7 +83,7 @@ Sized in `MANUFACTURING.md`: a 3″ × 3″ tube, 130 mm long, two end caps, and
 | Qty | Part | Where | SKU / part # | ≈ Price | Notes |
 | --- | --- | --- | --- | --- | --- |
 | 12″ | 6063-T52 aluminium square tube, 3″ × 3″ × ⅛″ wall | [Speedy Metals](https://www.speedymetals.com/pc-4685-8379-3-sq-wall-sq-tube-6063-t52-aluminum.aspx) | pc-4685 | $1.53/in (~$18) | Cut to the inch. 6063 anodizes the most evenly. Alt: [OnlineMetals pid 4602](https://www.onlinemetals.com/en/buy/aluminum/3-od-x-0-125-wall-aluminum-square-tube-6063-t52-extruded/pid/4602). |
-| 12″ | 6061-T6511 flat bar, ¼″ × 3″ | [Speedy Metals](https://www.speedymetals.com/p-2249-14-x-3-6061-t6511-aluminum-extruded.aspx) | p-2249 | *unconfirmed* | End caps. 3″ wide matches the tube, so each cap is just an 89 mm cut. Alt: [OnlineMetals ¼″ 6061-T651 plate, pid 1248](https://www.onlinemetals.com/en/buy/aluminum/0-25-aluminum-plate-6061-t651/pid/1248), from $12.88. |
+| 12″ | 6061-T6511 flat bar, ¼″ × 3″ | [Speedy Metals](https://www.speedymetals.com/p-2249-14-x-3-6061-t6511-aluminum-extruded.aspx) | p-2249 | *unconfirmed* | End caps. 3″ wide matches the tube, so each cap is just a 91 mm cut. Alt: [OnlineMetals ¼″ 6061-T651 plate, pid 1248](https://www.onlinemetals.com/en/buy/aluminum/0-25-aluminum-plate-6061-t651/pid/1248), from $12.88. |
 | 12″ × 12″ | 5052-H32 aluminium sheet, 0.063″ | [OnlineMetals](https://www.onlinemetals.com/en/buy/aluminum/0-063-aluminum-sheet-5052-h32/pid/7128) | pid 7128 | *unconfirmed* | Internal sled. 5052 bends without cracking. Alt: [Speedy Metals p-1939](https://www.speedymetals.com/p-1939-0063-5052-h32-aluminum-sheet.aspx). |
 
 ### Glass base (lamp)
