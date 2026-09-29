@@ -14,14 +14,20 @@ Runs the clock's real firmware, `src/main.cpp` and `include/alarm_face.hpp`, in 
 ## Build
 
 ```sh
-pip install ziglang     # Zig's C++ toolchain targets WebAssembly with libc++ included
-python sim/build.py     # writes sim/clock.wasm
+pip install ziglang==0.16.0     # Zig's C++ toolchain targets WebAssembly with libc++ included
+python sim/build.py             # writes sim/clock.wasm
+node sim/smoke_test.js          # boots it, taps the menu, runs random input
 python hardware/cad/viewer.py   # re-embeds it in the viewer
 ```
 
-`clock.wasm` is committed so the viewer can be rebuilt without Zig. Rebuild it whenever `src/main.cpp` or `include/` changes.
+`clock.wasm` is committed so the viewer can be rebuilt without Zig. **Rebuild and commit it whenever `src/main.cpp` or `include/` changes.** The build is reproducible: `build.py` pins the firmware's `__DATE__`/`__TIME__` stamp, and the Zig version is pinned. The same source therefore always gives the same bytes.
 
-If `main.cpp` starts using an M5Unified call the shim doesn't cover, the build fails with an unknown-member error. That's the cue to add the call to `shim/M5Unified.h`.
+## CI
+
+The `simulator` job in `.github/workflows/ci.yml` (and the Forgejo copy) fails in three cases:
+- **The firmware no longer builds for the browser.** Usually `main.cpp` started using an M5Unified call the shim doesn't cover, and the error names it (for example `no member named 'setRotation' in 'SimDisplay'`). Add the call to `shim/M5Unified.h`.
+- **`clock.wasm` doesn't match the source.** The firmware changed and `sim/clock.wasm` wasn't rebuilt. Run `python sim/build.py` and commit it.
+- **`smoke_test.js` fails.** The firmware didn't draw a clock at one of the screen sizes, the gear didn't open the menu, it crashed or drew garbage under random input, or saved settings didn't load after a reboot.
 
 ## Differences from the real clock
 

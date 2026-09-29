@@ -27,3 +27,29 @@ jobs:
           mkdir /tmp/screens
           /tmp/render_screens /tmp/screens
           diff -ru test/screens /tmp/screens
+
+  simulator:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: zig
+        run: |
+          if ! python3 -m pip --version >/dev/null 2>&1; then
+            if [ "$(id -u)" -eq 0 ]; then
+              apt-get update && apt-get install -y python3-pip
+            else
+              sudo apt-get update && sudo apt-get install -y python3-pip
+            fi
+          fi
+          python3 -m pip install --user --break-system-packages ziglang==0.16.0 \
+            || python3 -m pip install --user ziglang==0.16.0
+      - name: firmware builds for the browser
+        run: python3 sim/build.py
+      - name: committed simulator matches the firmware
+        run: |
+          if ! git diff --quiet -- sim/clock.wasm; then
+            echo "sim/clock.wasm doesn't match src/main.cpp. Run 'python sim/build.py' and commit sim/clock.wasm."
+            exit 1
+          fi
+      - name: simulator smoke test
+        run: node sim/smoke_test.js
