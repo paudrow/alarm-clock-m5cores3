@@ -74,6 +74,26 @@ Also needed: a few 10 kΩ resistors and 1 µF capacitors for the RC set-point fi
 
 **V2 total: about $270** before shipping (six vendors: LilyGO or Amazon, Digi-Key, Adafruit, Parts Express, Luxeon Star, Amazon).
 
+### V2 order list, by store
+
+The same parts grouped into one order per store, plus what the 3D-printed holders need (`cad/README.md`).
+
+| Store | Order | ≈ Subtotal |
+| --- | --- | --- |
+| **Luxeon Star** (order first: built to order) | 2 × SP-01-D2 deep-red star boards | $19 |
+| **LilyGO** or Amazon (order first: often out of stock) | T-Display-P4, **4.1″ AMOLED** variant | $119 |
+| **Digi-Key** | RV-3028-C7 evaluation board; 2 × MCP6022-I/P; 2 × IRL540NPBF; 2 × TN0702N3-G; 5 × RSMF1JB2R00 (2 Ω 1 W); 10 × RNF14FTD200R (200 Ω); 2 × BPW34; a few 10 kΩ resistors and 1 µF capacitors. Optional: 5 × GH QSSPA1.24-4T2U-1-FJ-350-R18 (needs hot air to solder). | $35–45 |
+| **Adafruit** | MAX98357A #3006; VEML7700 #4162; 27 W USB-C supply #5814; USB A-to-C cable #4474; breadboard #239; jumpers #758; 4 × Qwiic cable #4209 | $44 |
+| **Parts Express** | Tectonic TEBM35C10-4 (297-216). Optional: Dayton ND65-4 (290-204) to compare. It's too big for the printed test box, so listen to it in open air. | $10–33 |
+| **Amazon** | Samsung PRO Endurance 32 GB microSD | $12 |
+| **Dulles Glass** or a local glass shop | ½″ low-iron glass, 132 × 76 mm, flat polished edges | ~$30–60 |
+| **Bolt Depot** or a hardware store | 8 × M3 × 10 mm stainless screws | $3 |
+| Any felt supplier, or a scrap | A small piece of wool felt, for the test-box lid gasket | $0–5 |
+| Your printer | ~160 g PLA or PETG | ~$3 |
+| | **Total, with shipping from ~7 stores (~$50)** | **≈ $370** |
+
+Tools you'll want: a soldering iron, a multimeter, and for the flicker test, any oscilloscope (a cheap USB one is fine). Skip the optional OSRAM LEDs if you don't have hot air; the star boards are enough for V2.
+
 ## 2. Enclosure prototype (shop build)
 
 Sized in `MANUFACTURING.md`: a 3″ × 3″ tube, 130 mm long, two end caps, and a ½″ low-iron glass base. Overall about 143 × 93 × 76 mm (W × H × D) including feet. Quantities below build **two** cases, because the first is always a learning piece.
