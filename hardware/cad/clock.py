@@ -556,6 +556,23 @@ def write_viewer():
     with open(os.path.join(viewer, "index.html"), "w") as f:
         f.write(html)
 
+    # The same page as a standalone site (Cloudflare Workers static assets; see site/README.md)
+    head_end = html.index("</style>") + len("</style>")
+    site = os.path.join(here, "site", "public")
+    os.makedirs(site, exist_ok=True)
+    with open(os.path.join(site, "index.html"), "w") as f:
+        f.write(
+            "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n"
+            "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, viewport-fit=cover\">\n"
+            "<meta name=\"description\" content=\"An aluminium-and-glass bedside alarm clock, from breadboard "
+            "prototype to enclosure: interactive 3D model, fit checks and costs.\">\n"
+            "<link rel=\"icon\" href=\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E"
+            "%3Crect x='3' y='7' width='26' height='16' rx='2' fill='%231b1a1d'/%3E%3Ctext x='16' y='19.5' font-size='9' "
+            "text-anchor='middle' fill='%23e0142c' font-family='monospace'%3E7:41%3C/text%3E"
+            "%3Crect x='3' y='24' width='26' height='3' fill='%23e0142c' opacity='.6'/%3E%3C/svg%3E\">\n"
+            "<style>:root{color-scheme:light}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>\n"
+            + html[:head_end] + "\n</head>\n<body>\n" + html[head_end:] + "\n</body>\n</html>\n")
+
 
 if __name__ == "__main__":
     main()

@@ -9,6 +9,7 @@ A parametric model of the clock, written in Python with [CadQuery](https://cadqu
 | `out/<variant>/*.stl` | One STL per part, for 3D-printed mock-ups. Print `tube`, `cap_left`, `cap_right` and `glass_base` to judge size and proportions on the nightstand. |
 | `out/<variant>/report.json` | Sizes, masses, the collision check and the speaker-chamber volume |
 | `viewer_template.html` → `viewer/index.html` | The interactive 3D viewer, with all three versions embedded |
+| `site/` | The same viewer as a standalone site for alarmclock.audro.com (Cloudflare Workers); see `site/README.md` to deploy |
 
 ## V2 breadboard: parts to 3D-print
 
