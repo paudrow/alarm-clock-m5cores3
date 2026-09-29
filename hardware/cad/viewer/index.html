@@ -254,7 +254,6 @@ let variant = "full";
 let renderer, scene, camera, controls, root, floor, wash, lampLight, pmrem;
 let nodes = {}, mats = {}, screenPlane = null;
 const loader = new THREE.GLTFLoader();
-const glbCache = {};
 const stage = document.getElementById("stage");
 const hover = document.getElementById("hover");
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -401,59 +400,79 @@ function setView(name, instant) {
   })(t0);
 }
 
+// Each variant's parts are built once, then kept and swapped in and out of the scene.
+const variantCache = {};
+
+function buildVariant(key, gltf) {
+  const rep = REPORTS[key];
+  const built = {};
+  gltf.scene.traverse((o) => {
+    if (!o.isMesh) return;
+    const name = o.name.replace(/_\d+$/, "");
+    const info = rep.parts[name];
+    if (!info) return;
+    o.material = mats[info.look].clone();
+    o.castShadow = info.look !== "glass";
+    o.receiveShadow = true;
+    o.userData = { name, info, baseMat: o.material,
+      diagMat: new THREE.MeshStandardMaterial({ color: new THREE.Color(PART_COLOUR[name] || "#999").convertSRGBToLinear(), roughness: 0.6, metalness: 0.05, envMapIntensity: 0.5, emissive: 0x000000 }) };
+    if (!o.geometry.attributes.normal) o.geometry.computeVertexNormals();
+    const edges = new THREE.LineSegments(new THREE.EdgesGeometry(o.geometry, 30), new THREE.LineBasicMaterial({ color: 0x151518, transparent: true, opacity: 0.55 }));
+    edges.visible = false; edges.raycast = () => {};
+    o.add(edges); o.userData.edges = edges;
+    built[name] = o;
+  });
+  const plane = screenImage(rep);
+  if (built.screen) built.screen.add(plane);
+  variantCache[key] = { nodes: built, screenPlane: plane };
+}
+
+function showVariant(key) {
+  const rep = REPORTS[key];
+  const c = variantCache[key];
+  while (root.children.length) root.remove(root.children[0]);
+  nodes = c.nodes;
+  screenPlane = c.screenPlane;
+  Object.values(nodes).forEach((o) => root.add(o));
+  buildLabels();
+  const g = rep.geometry;
+  wash.scale.set(g.glass[0] * 1.9, g.glass[1] * 1.9, 1);
+  document.getElementById("loading").hidden = true;
+  document.getElementById("vlabel").textContent = rep.variant.label;
+  applyState();
+  renderFit(rep); renderParts(rep); renderCosts(); renderDims(rep);
+}
+
 function loadVariant(key) {
   variant = key;
-  const rep = REPORTS[key];
-  document.getElementById("loading").hidden = false;
-  const done = (gltf) => {
-    glbCache[key] = gltf;
-    while (root.children.length) root.remove(root.children[0]);
-    nodes = {};
-    gltf.scene.traverse((o) => {
-      if (!o.isMesh) return;
-      const name = o.name.replace(/_\d+$/, "");
-      const info = rep.parts[name];
-      if (!info) return;
-      o.material = mats[info.look].clone();
-      o.castShadow = info.look !== "glass";
-      o.receiveShadow = true;
-      o.userData = { name, info, base: o.position.clone(), baseMat: o.material,
-        diagMat: new THREE.MeshStandardMaterial({ color: new THREE.Color(PART_COLOUR[name] || "#999").convertSRGBToLinear(), roughness: 0.6, metalness: 0.05, envMapIntensity: 0.5, emissive: 0x000000 }) };
-      if (!o.geometry.attributes.normal) o.geometry.computeVertexNormals();
-      const edges = new THREE.LineSegments(new THREE.EdgesGeometry(o.geometry, 30), new THREE.LineBasicMaterial({ color: 0x151518, transparent: true, opacity: 0.55 }));
-      edges.visible = false; edges.raycast = () => {};
-      o.add(edges); o.userData.edges = edges;
-      nodes[name] = o;
-    });
-    Object.values(nodes).forEach((o) => root.add(o));
-    addScreenImage(rep);
-    buildLabels();
-    const g = rep.geometry;
-    wash.scale.set(g.glass[0] * 1.9, g.glass[1] * 1.9, 1);
-    lampLight.position.set(0, 8, 0);
-    document.getElementById("loading").hidden = true;
-    document.getElementById("vlabel").textContent = rep.variant.label;
-    applyState();
-    renderFit(rep); renderParts(rep); renderCosts(); renderDims(rep);
-  };
-  if (glbCache[key]) { done(glbCache[key]); return; }
+  if (variantCache[key]) { showVariant(key); return; }
+  const loading = document.getElementById("loading");
+  loading.textContent = "Loading model…";
+  loading.hidden = false;
   const bin = atob(GLB[key]);
   const buf = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
-  loader.parse(buf.buffer, "", done, () => {
-    document.getElementById("loading").textContent = "The 3D model didn't load. Reload the page to try again.";
+  loader.parse(buf.buffer, "", (gltf) => {
+    try {
+      buildVariant(key, gltf);
+      if (variant === key) showVariant(key); // ignore if the user has already switched away
+    } catch (err) {
+      loading.textContent = "The 3D model didn't load. Reload the page to try again.";
+      console.error(err);
+    }
+  }, () => {
+    loading.textContent = "The 3D model didn't load. Reload the page to try again.";
   });
 }
 
-function addScreenImage(rep) {
+function screenImage(rep) {
   const g = rep.geometry;
   const [aw, ah] = g.active;
   const plane = new THREE.Mesh(new THREE.PlaneGeometry(aw, ah),
     new THREE.MeshBasicMaterial({ map: digitsTexture(aw, ah), toneMapped: false }));
   plane.rotation.x = Math.PI / 2; // face -Y (front) in CAD axes
   plane.position.set(g.active_center[0], g.active_center[1] - 0.05, g.active_center[2]);
-  screenPlane = plane;
-  nodes.screen.add(plane);
+  return plane;
 }
 
 function applyState() {
