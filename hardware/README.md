@@ -8,6 +8,7 @@ Plans for taking the CoreS3 alarm clock (V1, the firmware in this repo) to custo
 | [`BOM.md`](BOM.md) | Bill of materials for the V2 breadboard and for production (~1k units), one-time costs, and design-for-manufacture notes |
 | [`FIRST-BATCH.md`](FIRST-BATCH.md) | A lean plan for a first run of 10 at ~$200: display options, cost per unit, pricing and how not to go broke |
 | [`CERTIFICATION.md`](CERTIFICATION.md) | What's needed to sell it legally in the US, Canada, EU and UK, what it costs, and how to pass first time |
+| [`cad/`](cad/README.md) | Parametric CAD model (CadQuery): STEP/STL for every part, fit checks, and a 3D viewer |
 | [`MANUFACTURING.md`](MANUFACTURING.md) | Enclosure construction, getting rid of plastics, finish, CNC design rules, uses for the 3D printer, assembly sequence, and how production scales |
 
 ## Requirements
@@ -33,7 +34,7 @@ Plans for taking the CoreS3 alarm clock (V1, the firmware in this repo) to custo
 | Chip | ESP32-P4, revision v3 (P4NRW32X) for the custom board | Drives small and 4″ AMOLEDs, has no radio, and has enough memory for a full frame |
 | Lamp | 660 nm LEDs, DC current drive, shining down into a ½″ low-iron glass base | Deep red, zero flicker; the glass glows and washes the nightstand |
 | Power | USB-C, 5 V / 3 A | Simple, and never touches mains |
-| Enclosure | 3″ × 3″ aluminium square tube (130 mm) + CNC end caps + internal sled, **black anodize**; about 143 × 89 × 76 mm overall | Sized around the screen and a 2″ speaker; premium look, no tooling to start |
+| Enclosure | 3″ × 3″ aluminium square tube (130 mm) + CNC end caps + internal sled, **black anodize**; about 143 × 93 × 76 mm overall | Sized around the screen and a 2″ speaker; premium look, no tooling to start |
 | Speaker | 2″ full-range (reference: Tectonic TEBM35C10-4), **firing out the back** | Clean front; a shallow driver fits the 3″ tube |
 
 ## Versions
@@ -64,4 +65,4 @@ Plans for taking the CoreS3 alarm clock (V1, the firmware in this repo) to custo
    - Check readability at 10 ft.
    - Pick the speaker.
 3. **Quotes:** request them for the 4.1″ AMOLED with a custom cover glass, and speaker samples.
-4. **Mock-ups:** 3D-print the 143 × 89 × 76 mm case, then cut the first aluminium one (materials in `BOM.md` section 2).
+4. **Mock-ups:** 3D-print the case from the STLs in `cad/out/`, then cut the first aluminium one (materials in `BOM.md` section 2).

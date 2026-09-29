@@ -1,5 +1,7 @@
 # Manufacturing plan
 
+The enclosure is modelled in `cad/clock.py`. STEP and STL files for every part are in `cad/out/`, and there's an interactive 3D viewer in `cad/viewer/index.html`.
+
 How to build the enclosure and assemble the clock, from first prototypes in a home shop to small-batch sales and beyond. Parts and costs are in `BOM.md`; the electronics are in `DESIGN.md`.
 
 Goals:
@@ -34,9 +36,9 @@ Decided so far:
 
 | Component | Size | Source |
 | --- | --- | --- |
-| Screen with cover glass (T-Display-P4, 4.1″ AMOLED) | ~111 × 61 mm face; ~18 mm deep including the board behind it (22 mm in LilyGO's own shell) | LilyGO's 3D model, `structure/H753.stp` in the [T-Display-P4 repo](https://github.com/Xinyuan-LilyGO/T-Display-P4) |
+| Screen module (T-Display-P4, 4.1″ AMOLED: panel plus its board, without LilyGO's shell) | **103.8 × 51.3 mm face, 12.3 mm deep** | LilyGO's 3D model, `structure/H753.stp` in the [T-Display-P4 repo](https://github.com/Xinyuan-LilyGO/T-Display-P4) |
 | Visible screen area | ~94.5 × 43.6 mm | 4.1″ diagonal at 1232 × 568 |
-| Speaker (Tectonic TEBM35C10-4, 2″ BMR) | 2″ class, ~1″ deep | **Confirm the frame size on the Parts Express spec sheet before drawing the back wall** |
+| Speaker (Tectonic TEBM35C10-4, 2″ BMR) | 52 mm across (54 mm at the tabs), 25.1 mm deep | Tectonic datasheet |
 | Glass base | ½″ (12.7 mm) thick | |
 
 Fitting these into a **3″ × 3″ × ⅛″ tube** (69.9 mm inside):
@@ -52,7 +54,7 @@ Fitting these into a **3″ × 3″ × ⅛″ tube** (69.9 mm inside):
 - **Length:** tube cut to **130 mm**. The ~111 mm screen sits centred with room at each end for the FPC and the end-cap steps.
 - **A 2.5″ driver (Dayton ND65) is too big** for the back wall of a 3″ tube. If it clearly wins the listening test, move to a 3″ × 4″ rectangular tube (4″ deep), which also doubles the chamber volume.
 
-**Resulting size:** about **143 W × 89 H × 76 D mm** (5.6″ × 3.5″ × 3.0″). That's the tube (76.2 mm) plus the glass (12.7 mm) for the height, and 130 mm plus two ¼″ caps for the width. Weight is about 0.5 kg for the aluminium plus ~0.3 kg for the glass. Heavy enough that tapping the screen never moves it.
+**Resulting size** (from the CAD model in `cad/`): **142.7 W × 92.5 H × 76.2 D mm** (5.6″ × 3.6″ × 3.0″) including the cork feet. The full model builds with **no collisions** between any of its 15 parts, and the sealed speaker chamber comes out at **0.19 L**. That's the tube (76.2 mm) plus the glass (12.7 mm) for the height, and 130 mm plus two ¼″ caps for the width. It weighs about 1.0 kg (0.6 kg aluminium, 0.3 kg glass): heavy enough that tapping the screen never moves it.
 
 Print the whole thing in PLA first. Proportions are easier to judge on the nightstand than on screen.
 
@@ -64,7 +66,7 @@ Print the whole thing in PLA first. Proportions are easier to judge on the night
   - Bottom face: the lamp slot, about 100 × 6 mm.
 
   Stock tube needs **no tooling**. A custom extrusion die (`BOM.md`) only makes sense much later.
-- **End caps:** two pieces of ¼″ × 3″ 6061 flat bar, each cut to 89 mm tall. The upper part of each cap has a ~3 mm step that locates inside the tube. The lower 12.7 mm, below the tube, has a **1.5 mm-deep groove** that holds the end of the glass base. One cap has the USB-C opening, the other the snooze/stop button. **The caps are the feet**, with cork pads.
+- **End caps:** two pieces of ¼″ × 3″ 6061 flat bar, each cut to 91 mm tall. The upper part of each cap has a 3 mm-tall machined ring that locates inside the tube. It is a ring rather than a solid block so the PCB and USB-C socket can reach the cap. The lower part, below the tube, has a **1 mm-deep groove** that holds the end of the glass base. One cap has the USB-C opening, the other the snooze/stop button. **The caps are the feet**, with cork pads.
 - **Sled:** a bent 5052 aluminium sheet screwed to one end cap. It carries:
   - the PCB on aluminium standoffs;
   - the speaker bulkhead.

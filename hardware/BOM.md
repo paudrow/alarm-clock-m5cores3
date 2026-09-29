@@ -76,7 +76,7 @@ Also needed: a few 10 kΩ resistors and 1 µF capacitors for the RC set-point fi
 
 ## 2. Enclosure prototype (shop build)
 
-Sized in `MANUFACTURING.md`: a 3″ × 3″ tube, 130 mm long, two end caps, and a ½″ low-iron glass base. Overall about 143 × 89 × 76 mm (W × H × D). Quantities below build **two** cases, because the first is always a learning piece.
+Sized in `MANUFACTURING.md`: a 3″ × 3″ tube, 130 mm long, two end caps, and a ½″ low-iron glass base. Overall about 143 × 93 × 76 mm (W × H × D) including feet. Quantities below build **two** cases, because the first is always a learning piece.
 
 ### Metal
 

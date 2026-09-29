@@ -1,0 +1,608 @@
+<title>Alarm Clock Enclosure V3</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chivo:wght@400;600;800&family=Chivo+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a workbench. The model owns the left; a narrow spec sheet (controls, fit, cost, parts) runs down the right. */
+:root {
+  --bg: #e7e6e4;
+  --panel: #f5f4f2;
+  --stage: #d6d4d1;
+  --fg: #1b1a1d;
+  --muted: #625e66;
+  --line: #cdcac6;
+  --accent: #b3142a;
+  --good: #2d6b45;
+  --warn: #8a5a00;
+  --font-ui: "Chivo", "Helvetica Neue", Arial, sans-serif;
+  --font-data: "Chivo Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141316; --panel: #1c1a1f; --stage: #242227; --fg: #ebe9e6; --muted: #a29ea8;
+    --line: #322f36; --accent: #ff4757; --good: #6fcf97; --warn: #f2c94c; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141316; --panel: #1c1a1f; --stage: #242227; --fg: #ebe9e6; --muted: #a29ea8;
+  --line: #322f36; --accent: #ff4757; --good: #6fcf97; --warn: #f2c94c; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-ui); font-size: 15px; line-height: 1.5; }
+.wrap { padding-inline: 16px; padding-block: 20px 40px; max-width: 1400px; margin: 0 auto; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; margin-bottom: 16px; }
+h1 { font-weight: 800; font-size: clamp(22px, 3vw, 30px); letter-spacing: -0.01em; margin: 0; text-wrap: balance; }
+h1 .dot { color: var(--accent); }
+.sub { color: var(--muted); margin: 2px 0 0; max-width: 62ch; }
+.dims { font-family: var(--font-data); font-size: 13px; color: var(--muted); white-space: nowrap; }
+.grid { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 20px; align-items: start; }
+@media (max-width: 960px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+.stage-wrap { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); }
+@media (max-width: 960px) { .stage-wrap { position: relative; top: 0; } }
+.stage { position: relative; background: var(--stage); border-radius: 6px; overflow: hidden; height: min(78vh, 760px); min-height: 360px; }
+@media (max-width: 960px) { .stage { height: auto; aspect-ratio: 1 / 1; max-height: 72vh; min-height: 0; max-width: 100%; } }
+.stage canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.hud { position: absolute; left: 12px; top: 12px; right: 12px; display: flex; justify-content: space-between; gap: 8px; pointer-events: none; }
+.tag { font-family: var(--font-data); font-size: 12px; background: var(--panel); color: var(--fg); border: 1px solid var(--line); padding: 4px 8px; border-radius: 4px; }
+.tag[hidden] { display: none; }
+.loading[hidden] { display: none; }
+.loading { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-family: var(--font-data); font-size: 13px; }
+.views { position: absolute; left: 12px; bottom: 12px; display: flex; flex-wrap: wrap; gap: 6px; }
+.views button, .seg button { font: 600 13px var(--font-ui); color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 6px 10px; cursor: pointer; }
+.views button:hover, .seg button:hover { border-color: var(--fg); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.side { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+section.card { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; min-width: 0; }
+h2 { font-size: 12px; font-weight: 800; letter-spacing: 0.09em; text-transform: uppercase; margin: 0 0 10px; color: var(--muted); }
+.seg { display: flex; gap: 0; }
+.seg button { border-radius: 0; flex: 1; }
+.seg button:first-child { border-radius: 4px 0 0 4px; }
+.seg button:last-child { border-radius: 0 4px 4px 0; margin-left: -1px; }
+.seg button[aria-pressed="true"] { background: var(--fg); color: var(--panel); border-color: var(--fg); }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; }
+.row label { font-weight: 600; font-size: 14px; }
+input[type="range"] { width: 55%; accent-color: var(--accent); }
+.toggle { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; cursor: pointer; }
+.toggle input { accent-color: var(--accent); width: 16px; height: 16px; }
+.toggles { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 12px; }
+.status { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.pill { font: 600 12px var(--font-data); padding: 2px 8px; border-radius: 999px; border: 1px solid currentColor; }
+.ok { color: var(--good); } .bad { color: var(--accent); }
+dl.kv { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 14px; margin: 12px 0 0; font-size: 14px; }
+dl.kv dt { color: var(--muted); }
+dl.kv dd { margin: 0; font-family: var(--font-data); font-size: 13px; text-align: right; font-variant-numeric: tabular-nums; }
+.note { color: var(--muted); font-size: 13px; margin: 10px 0 0; }
+.tbl-wrap { overflow-x: auto; margin-top: 4px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+td, th { padding: 5px 0; border-bottom: 1px solid var(--line); vertical-align: middle; text-align: left; }
+th { font-weight: 600; color: var(--muted); font-size: 12px; }
+td.num, th.num { text-align: right; font-family: var(--font-data); font-variant-numeric: tabular-nums; white-space: nowrap; }
+td .src { display: block; font-size: 11px; color: var(--muted); font-family: var(--font-data); }
+td input { width: 74px; font: 13px var(--font-data); text-align: right; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 3px; padding: 2px 4px; }
+tr.total td { font-weight: 800; border-bottom: none; padding-top: 8px; }
+tr.sub td { color: var(--muted); }
+.big { font: 500 26px var(--font-data); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.totals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+.totals div { border-top: 2px solid var(--line); padding-top: 6px; }
+.totals div.hl { border-top-color: var(--accent); }
+.totals span { display: block; font-size: 12px; color: var(--muted); }
+.parts-list { list-style: none; margin: 0; padding: 0; }
+.parts-list li { display: grid; grid-template-columns: 12px minmax(0, 1fr) auto; gap: 10px; align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--line); cursor: pointer; }
+.parts-list li:last-child { border-bottom: none; }
+.parts-list li:hover .pn { color: var(--accent); }
+.sw { width: 10px; height: 10px; border-radius: 2px; border: 1px solid var(--line); align-self: center; }
+.pn { font-weight: 600; font-size: 14px; }
+.pm { display: block; color: var(--muted); font-size: 12px; }
+.pd { font-family: var(--font-data); font-size: 12px; color: var(--muted); text-align: right; white-space: nowrap; }
+footer { color: var(--muted); font-size: 13px; margin-top: 18px; max-width: 80ch; }
+code { font-family: var(--font-data); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Alarm clock enclosure<span class="dot">.</span></h1>
+      <p class="sub">Black-anodized aluminium tube and end caps on a ½″ low-iron glass base that glows 660 nm red. Drag to orbit, scroll or pinch to zoom, hover a part to name it.</p>
+    </div>
+    <div class="dims" id="dims"></div>
+  </header>
+
+  <div class="grid">
+    <div class="stage-wrap">
+      <div class="stage" id="stage">
+        <div class="loading" id="loading">Loading model…</div>
+        <div class="hud"><span class="tag" id="hover" hidden></span><span class="tag" id="vlabel"></span></div>
+        <div class="views" role="group" aria-label="Camera views">
+          <button type="button" data-view="three">¾ view</button>
+          <button type="button" data-view="front">Front</button>
+          <button type="button" data-view="back">Back</button>
+          <button type="button" data-view="side">Side</button>
+          <button type="button" data-view="below">Below</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="side">
+      <section class="card" aria-labelledby="h-build">
+        <h2 id="h-build">Build</h2>
+        <div class="seg" role="group" aria-label="Screen">
+          <button type="button" id="v-full" aria-pressed="true">4.1″ AMOLED</button>
+          <button type="button" id="v-lean" aria-pressed="false">2.41″ lean</button>
+        </div>
+        <div class="row">
+          <label for="explode">Explode</label>
+          <input type="range" id="explode" min="0" max="100" value="0">
+        </div>
+        <div class="toggles">
+          <label class="toggle"><input type="checkbox" id="lamp" checked> Lamp on</label>
+          <label class="toggle"><input type="checkbox" id="cutaway"> See inside</label>
+          <label class="toggle"><input type="checkbox" id="screen" checked> Screen on</label>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="h-fit">
+        <h2 id="h-fit">Fit check</h2>
+        <div class="status" id="fit-status"></div>
+        <dl class="kv" id="fit-kv"></dl>
+        <p class="note" id="fit-note"></p>
+      </section>
+
+      <section class="card" aria-labelledby="h-cost">
+        <h2 id="h-cost">Cost per clock, batch of 10</h2>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>Item</th><th class="num">$ each</th></tr></thead>
+            <tbody id="cost-rows"></tbody>
+          </table>
+        </div>
+        <div class="row">
+          <label for="hours">Your hours per clock</label>
+          <input type="number" id="hours" min="0" step="0.25" value="1.25" style="width:74px;font:13px var(--font-data);text-align:right;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:3px;padding:2px 4px">
+        </div>
+        <div class="row">
+          <label for="rate">Your rate, $/h</label>
+          <input type="number" id="rate" min="0" step="5" value="40" style="width:74px;font:13px var(--font-data);text-align:right;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:3px;padding:2px 4px">
+        </div>
+        <div class="row">
+          <label for="price">Selling price</label>
+          <input type="number" id="price" min="0" step="10" value="200" style="width:74px;font:13px var(--font-data);text-align:right;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:3px;padding:2px 4px">
+        </div>
+        <div class="totals">
+          <div><span>Cash</span><b class="big" id="t-cash"></b></div>
+          <div class="hl"><span>With your time</span><b class="big" id="t-all"></b></div>
+          <div><span>Margin each</span><b class="big" id="t-margin"></b></div>
+        </div>
+        <p class="note">Edit any price to try a real quote; your edits stay in this browser. Margin allows 3% for card fees and assumes shipping is charged to the buyer. Certification (FCC testing, $1,000–3,000 for the batch) is not included.</p>
+      </section>
+
+      <section class="card" aria-labelledby="h-parts">
+        <h2 id="h-parts">Parts</h2>
+        <ul class="parts-list" id="parts"></ul>
+      </section>
+    </div>
+  </div>
+
+  <footer>
+    Generated from <code>hardware/cad/clock.py</code> (CadQuery). STEP and STL files for every part are in <code>hardware/cad/out/</code>, ready for the 3D printer or CAM. The 4.1″ screen module uses the outline measured from LilyGO's published T-Display-P4 model; the 2.41″ outline is an estimate until the Waveshare drawing is checked. The screen shows where the digits fall, not the real UI.
+  </footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/environments/RoomEnvironment.js"></script>
+<script>
+const REPORTS = /*REPORTS*/;
+const GLB = /*GLB*/; // base64-encoded models, one per variant
+
+const COSTS = {
+  full: [
+    ["brain", "LilyGO T-Display-P4, 4.1″ AMOLED", 119.30, "retail price"],
+    ["carrier", "Carrier PCB, assembled: USB-C power, amp, lamp driver, 4 LEDs, RTC", 18, "estimate"],
+    ["speaker", "Tectonic TEBM35C10-4 speaker", 9.98, "retail price"],
+    ["tube", "Tube, 3″ square 6063", null, "$1.53/in, Speedy Metals"],
+    ["caps", "Two end caps from ¼″ × 3″ 6061 bar", 4.50, "estimate"],
+    ["sheet", "5052 sheet: sled, chamber, frame", 2.30, "estimate"],
+    ["glass", "½″ low-iron glass base (ordered 10 at once)", 15, "estimate"],
+    ["anodize", "Black anodizing, one lot shared by 10", 10, "estimate"],
+    ["hardware", "Screws, thread inserts, standoffs", 4, "estimate"],
+    ["soft", "Wool felt, lambswool, cork, damping", 4, "estimate"],
+    ["box", "Box, insert, USB-C cable", 6, "estimate"],
+    ["freight", "Shipping on parts", 5, "estimate"]
+  ],
+  lean: [
+    ["brain", "Waveshare ESP32-S3 2.41″ AMOLED board", 40, "estimate"],
+    ["carrier", "Carrier PCB, assembled: USB-C power, amp, lamp driver, 4 LEDs, RTC", 18, "estimate"],
+    ["speaker", "Tectonic TEBM35C10-4 speaker", 9.98, "retail price"],
+    ["tube", "Tube, 3″ square 6063", null, "$1.53/in, Speedy Metals"],
+    ["caps", "Two end caps from ¼″ × 3″ 6061 bar", 4.50, "estimate"],
+    ["sheet", "5052 sheet: sled, chamber, frame", 1.90, "estimate"],
+    ["glass", "½″ low-iron glass base (ordered 10 at once)", 13, "estimate"],
+    ["anodize", "Black anodizing, one lot shared by 10", 10, "estimate"],
+    ["hardware", "Screws, thread inserts, standoffs", 4, "estimate"],
+    ["soft", "Wool felt, lambswool, cork, damping", 4, "estimate"],
+    ["box", "Box, insert, USB-C cable", 6, "estimate"],
+    ["freight", "Shipping on parts", 5, "estimate"]
+  ]
+};
+const SCRAP = 0.03;
+
+const LOOK_SWATCH = { alu_black: "#1b1b1e", alu_raw: "#b9bcc0", glass: "#cfe3e0", screen: "#050505", pcb: "#16201b", steel: "#9a9da2", led: "#d0142a", speaker: "#2c2c2f", cork: "#a9825a" };
+
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+};
+
+let variant = "full";
+let renderer, scene, camera, controls, root, floor, wash, lampLight, pmrem;
+let nodes = {}, mats = {}, screenPlane = null;
+const loader = new THREE.GLTFLoader();
+const glbCache = {};
+const stage = document.getElementById("stage");
+const hover = document.getElementById("hover");
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function cssVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+
+function makeMaterials() {
+  mats.alu_black = new THREE.MeshPhysicalMaterial({ color: 0x2c2c31, metalness: 0.6, roughness: 0.36, clearcoat: 0.3, clearcoatRoughness: 0.45, envMapIntensity: 1.3 });
+  mats.alu_raw = new THREE.MeshStandardMaterial({ color: 0xb9bcc0, metalness: 0.9, roughness: 0.35 });
+  mats.glass = new THREE.MeshPhysicalMaterial({ color: 0xeef7f5, metalness: 0, roughness: 0.3, transmission: 0.9, transparent: true, opacity: 1, emissive: 0x000000 });
+  mats.screen = new THREE.MeshStandardMaterial({ color: 0x040404, metalness: 0.1, roughness: 0.12 });
+  mats.pcb = new THREE.MeshStandardMaterial({ color: 0x15201a, roughness: 0.7 });
+  mats.steel = new THREE.MeshStandardMaterial({ color: 0x9a9da2, metalness: 0.9, roughness: 0.3 });
+  mats.led = new THREE.MeshStandardMaterial({ color: 0x551018, emissive: 0xff1030, emissiveIntensity: 1 });
+  mats.speaker = new THREE.MeshStandardMaterial({ color: 0x2b2b2e, roughness: 0.6, metalness: 0.2 });
+  mats.cork = new THREE.MeshStandardMaterial({ color: 0xa9825a, roughness: 0.95 });
+}
+
+function digitsTexture(w, h) {
+  const scale = 12;
+  const c = document.createElement("canvas");
+  c.width = Math.round(w * scale); c.height = Math.round(h * scale);
+  const g = c.getContext("2d");
+  g.fillStyle = "#000"; g.fillRect(0, 0, c.width, c.height);
+  const text = "7:41";
+  let size = c.height * 0.86;
+  g.font = `600 ${size}px "Chivo", Arial, sans-serif`;
+  const tw = g.measureText(text).width;
+  if (tw > c.width * 0.92) { size *= (c.width * 0.92) / tw; g.font = `600 ${size}px "Chivo", Arial, sans-serif`; }
+  g.textAlign = "center"; g.textBaseline = "middle";
+  g.shadowColor = "rgba(255,20,40,0.55)"; g.shadowBlur = size * 0.06;
+  g.fillStyle = "#e0142c";
+  g.fillText(text, c.width / 2, c.height * 0.53);
+  const t = new THREE.CanvasTexture(c);
+  t.encoding = THREE.sRGBEncoding;
+  t.anisotropy = 8;
+  return t;
+}
+
+function washTexture() {
+  const c = document.createElement("canvas"); c.width = c.height = 256;
+  const g = c.getContext("2d");
+  const grd = g.createRadialGradient(128, 128, 10, 128, 128, 128);
+  grd.addColorStop(0, "rgba(200,10,30,0.75)"); grd.addColorStop(0.45, "rgba(200,10,30,0.28)"); grd.addColorStop(1, "rgba(200,10,30,0)");
+  g.fillStyle = grd; g.fillRect(0, 0, 256, 256);
+  return new THREE.CanvasTexture(c);
+}
+
+function init() {
+  renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.0;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  stage.prepend(renderer.domElement);
+
+  scene = new THREE.Scene();
+  pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new THREE.RoomEnvironment(), 0.04).texture;
+
+  camera = new THREE.PerspectiveCamera(30, 1, 5, 5000);
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = !reduceMotion;
+  controls.target.set(0, 46, 0);
+  controls.maxPolarAngle = Math.PI * 0.62;
+  controls.minDistance = 120; controls.maxDistance = 900;
+
+  const key = new THREE.DirectionalLight(0xffffff, 1.4);
+  key.position.set(180, 320, 220);
+  key.castShadow = true;
+  key.shadow.mapSize.set(2048, 2048);
+  Object.assign(key.shadow.camera, { left: -200, right: 200, top: 200, bottom: -200, near: 50, far: 900 });
+  key.shadow.bias = -0.0005;
+  scene.add(key);
+  const rim = new THREE.DirectionalLight(0xffffff, 0.5);
+  rim.position.set(-250, 150, -200);
+  scene.add(rim);
+
+  floor = new THREE.Mesh(new THREE.PlaneGeometry(3000, 3000), new THREE.ShadowMaterial({ opacity: 0.22 }));
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.y = -1.61;
+  floor.receiveShadow = true;
+  scene.add(floor);
+
+  wash = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: washTexture(), transparent: true, opacity: 0.8, depthWrite: false, toneMapped: false }));
+  wash.rotation.x = -Math.PI / 2;
+  wash.position.y = -1.55;
+  scene.add(wash);
+
+  lampLight = new THREE.PointLight(0xff1a33, 0, 260, 2);
+  scene.add(lampLight);
+
+  root = new THREE.Group();
+  root.rotation.x = -Math.PI / 2; // CAD is Z-up; three.js is Y-up
+  scene.add(root);
+
+  makeMaterials();
+  applyTheme();
+  new MutationObserver(applyTheme).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme);
+
+  addEventListener("resize", resize);
+  new ResizeObserver(resize).observe(stage);
+  resize();
+  setView("three", true);
+  renderer.domElement.addEventListener("pointermove", onHover);
+  renderer.domElement.addEventListener("pointerleave", () => { hover.hidden = true; });
+  animate();
+}
+
+function applyTheme() {
+  const bg = new THREE.Color(cssVar("--stage") || "#d6d4d1");
+  scene.background = bg;
+}
+
+function resize() {
+  const r = stage.getBoundingClientRect();
+  renderer.setSize(r.width, r.height, false);
+  camera.aspect = r.width / Math.max(r.height, 1);
+  camera.updateProjectionMatrix();
+}
+
+const VIEWS = {
+  three: [300, 190, 360],
+  front: [0, 70, 470],
+  back: [-120, 150, -430],
+  side: [470, 80, 30],
+  below: [220, -20, 300]
+};
+function setView(name, instant) {
+  const p = VIEWS[name];
+  const dist = variant === "lean" ? 0.88 : 1;
+  const to = new THREE.Vector3(p[0] * dist, p[1] * dist, p[2] * dist);
+  if (instant || reduceMotion) { camera.position.copy(to); controls.update(); return; }
+  const from = camera.position.clone(); const t0 = performance.now();
+  (function step(now) {
+    const k = Math.min((now - t0) / 600, 1); const e = 1 - Math.pow(1 - k, 3);
+    camera.position.lerpVectors(from, to, e); controls.update();
+    if (k < 1) requestAnimationFrame(step);
+  })(t0);
+}
+
+function loadVariant(key) {
+  variant = key;
+  const rep = REPORTS[key];
+  document.getElementById("loading").hidden = false;
+  const done = (gltf) => {
+    glbCache[key] = gltf;
+    while (root.children.length) root.remove(root.children[0]);
+    nodes = {};
+    gltf.scene.traverse((o) => {
+      if (!o.isMesh) return;
+      const name = o.name.replace(/_\d+$/, "");
+      const info = rep.parts[name];
+      if (!info) return;
+      o.material = mats[info.look].clone();
+      o.castShadow = info.look !== "glass";
+      o.receiveShadow = true;
+      o.userData = { name, info, base: o.position.clone(), baseMat: o.material };
+      nodes[name] = o;
+    });
+    Object.values(nodes).forEach((o) => root.add(o));
+    addScreenImage(rep);
+    const g = rep.geometry;
+    wash.scale.set(g.glass[0] * 1.9, g.glass[1] * 1.9, 1);
+    lampLight.position.set(0, 8, 0);
+    document.getElementById("loading").hidden = true;
+    document.getElementById("vlabel").textContent = rep.variant.label;
+    applyState();
+    renderFit(rep); renderParts(rep); renderCosts(); renderDims(rep);
+  };
+  if (glbCache[key]) { done(glbCache[key]); return; }
+  const bin = atob(GLB[key]);
+  const buf = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+  loader.parse(buf.buffer, "", done, () => {
+    document.getElementById("loading").textContent = "The 3D model didn't load. Reload the page to try again.";
+  });
+}
+
+function addScreenImage(rep) {
+  const g = rep.geometry;
+  const [aw, ah] = g.active;
+  const plane = new THREE.Mesh(new THREE.PlaneGeometry(aw, ah),
+    new THREE.MeshBasicMaterial({ map: digitsTexture(aw, ah), toneMapped: false }));
+  plane.rotation.x = Math.PI / 2; // face -Y (front) in CAD axes
+  plane.position.set(g.active_center[0], g.active_center[1] - 0.05, g.active_center[2]);
+  screenPlane = plane;
+  nodes.screen.add(plane);
+}
+
+function applyState() {
+  const ex = +document.getElementById("explode").value / 100;
+  const lamp = document.getElementById("lamp").checked;
+  const cut = document.getElementById("cutaway").checked;
+  const scr = document.getElementById("screen").checked;
+  for (const [name, o] of Object.entries(nodes)) {
+    const v = o.userData.info.explode;
+    o.position.set(v[0] * ex * 70, v[1] * ex * 70, v[2] * ex * 70);
+    const see = cut && (name === "tube" || name === "cap_left" || name === "button");
+    o.material.transparent = see || o.userData.info.look === "glass";
+    o.material.opacity = see ? 0.14 : 1;
+    o.material.depthWrite = !see;
+    o.castShadow = !see && o.userData.info.look !== "glass";
+  }
+  if (nodes.glass_base) {
+    nodes.glass_base.material.emissive.setHex(lamp ? 0xb00018 : 0x000000);
+    nodes.glass_base.material.emissiveIntensity = lamp ? 1.0 : 0;
+  }
+  if (nodes.leds) nodes.leds.material.emissiveIntensity = lamp ? 1.4 : 0;
+  lampLight.intensity = lamp ? 1.6 : 0;
+  lampLight.position.y = 8 + (nodes.glass_base ? nodes.glass_base.position.z : 0);
+  wash.visible = lamp && ex < 0.05;
+  if (screenPlane) screenPlane.visible = scr;
+}
+
+const ray = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+function onHover(e) {
+  const r = renderer.domElement.getBoundingClientRect();
+  mouse.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(mouse, camera);
+  const cut = document.getElementById("cutaway").checked;
+  const hits = ray.intersectObjects(Object.values(nodes), false).filter((h) => !(cut && h.object.material.opacity < 0.5));
+  if (!hits.length) { hover.hidden = true; return; }
+  const o = hits[0].object.userData.name ? hits[0].object : hits[0].object.parent;
+  const info = o.userData.info;
+  hover.textContent = info.material ? `${info.label} · ${info.material}` : info.label;
+  hover.hidden = false;
+}
+
+function flash(name) {
+  const o = nodes[name]; if (!o) return;
+  const m = o.material; const old = m.emissive ? m.emissive.getHex() : null;
+  if (!m.emissive) return;
+  m.emissive.setHex(0xff2040); m.emissiveIntensity = 0.8;
+  setTimeout(() => { applyState(); if (name !== "glass_base" && name !== "leds") { m.emissive.setHex(old); m.emissiveIntensity = 1; } }, 700);
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+// ---------- panels ----------
+const fmt = (n, d = 0) => n.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+const inch = (mm) => mm / 25.4;
+
+function renderDims(rep) {
+  const g = rep.geometry;
+  document.getElementById("dims").textContent =
+    `${fmt(g.overall_w, 1)} × ${fmt(g.overall_h, 1)} × ${fmt(g.overall_d, 1)} mm  ·  ${fmt(inch(g.overall_w), 2)} × ${fmt(inch(g.overall_h), 2)} × ${fmt(inch(g.overall_d), 2)} in`;
+}
+
+function digitHeight(g) {
+  const [aw, ah] = g.active;
+  const four = Math.min(ah * 0.9, (aw / 4.4) / 0.56);
+  const three = Math.min(ah * 0.9, (aw / 3.4) / 0.56);
+  return [four, three];
+}
+
+function renderFit(rep) {
+  const n = Object.keys(rep.parts).length;
+  const pairs = n * (n - 1) / 2;
+  const clash = rep.clashes.length;
+  document.getElementById("fit-status").innerHTML = clash
+    ? `<span class="pill bad">${clash} clash${clash > 1 ? "es" : ""}</span> ${rep.clashes.map((c) => `${c.a} × ${c.b}`).join(", ")}`
+    : `<span class="pill ok">No clashes</span> ${n} parts, ${pairs} pairs checked`;
+  const g = rep.geometry;
+  const mass = Object.values(rep.parts).reduce((s, p) => s + (p.mass_g || 0), 0) + (variant === "full" ? 60 : 35) + 45;
+  const [d4, d3] = digitHeight(g);
+  const kv = [
+    ["Overall size", `${fmt(g.overall_w, 1)} × ${fmt(g.overall_h, 1)} × ${fmt(g.overall_d, 1)} mm`],
+    ["Weight, approx.", `${fmt(mass / 1000, 2)} kg`],
+    ["Screen window", `${fmt(g.window[0], 1)} × ${fmt(g.window[1], 1)} mm`],
+    ["Digit height, 12:34", `${fmt(d4, 0)} mm (${fmt(inch(d4), 2)}″)`],
+    ["Digit height, 9:41", `${fmt(d3, 0)} mm (${fmt(inch(d3), 2)}″)`],
+    ["Speaker chamber", `${fmt(rep.chamber_litres, 2)} L sealed`],
+    ["Tube cut length", `${fmt(g.tube_len, 0)} mm (${fmt(inch(g.tube_len), 2)}″)`],
+    ["Glass base", `${fmt(g.glass[0], 0)} × ${fmt(g.glass[1], 1)} × ${fmt(g.glass[2], 1)} mm`]
+  ];
+  document.getElementById("fit-kv").innerHTML = kv.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
+  document.getElementById("fit-note").textContent = rep.variant.screen_measured
+    ? "Every part pair was intersected in CAD. Readable at 10 ft wants digits of about 25 mm (1″) or more."
+    : "Every part pair was intersected in CAD. The 2.41″ board outline is estimated, so re-run the check once its drawing is confirmed. Readable at 10 ft wants digits of about 25 mm (1″) or more.";
+}
+
+function renderParts(rep) {
+  const ul = document.getElementById("parts");
+  ul.innerHTML = Object.entries(rep.parts).map(([k, p]) => {
+    const b = p.bbox.map((x) => fmt(x, 1)).join(" × ");
+    return `<li data-part="${k}"><span class="sw" style="background:${LOOK_SWATCH[p.look]}"></span><span><span class="pn">${p.label}</span><span class="pm">${p.material || "&nbsp;"}</span></span><span class="pd">${b} mm${p.mass_g ? `<br>${fmt(p.mass_g, 0)} g` : ""}</span></li>`;
+  }).join("");
+  ul.querySelectorAll("li").forEach((li) => li.addEventListener("click", () => flash(li.dataset.part)));
+}
+
+function costRows() {
+  const rep = REPORTS[variant];
+  const saved = store.get(`costs-${variant}`, {});
+  return COSTS[variant].map(([id, label, price, src]) => {
+    let p = price;
+    if (id === "tube") p = +(inch(rep.geometry.tube_len + 3) * 1.53).toFixed(2);
+    if (saved[id] != null) p = saved[id];
+    return { id, label, price: p, src };
+  });
+}
+
+function renderCosts() {
+  const rows = costRows();
+  document.getElementById("cost-rows").innerHTML = rows.map((r) =>
+    `<tr><td>${r.label}<span class="src">${r.src}</span></td><td class="num"><input type="number" min="0" step="0.5" id="c-${r.id}" data-id="${r.id}" value="${r.price}" aria-label="${r.label}, dollars each"></td></tr>`
+  ).join("") +
+    `<tr class="sub"><td>Scrap allowance, 3%</td><td class="num" id="c-scrap"></td></tr>` +
+    `<tr class="total"><td>Cash per clock</td><td class="num" id="c-total"></td></tr>`;
+  document.querySelectorAll("#cost-rows input").forEach((inp) => inp.addEventListener("input", () => {
+    const saved = store.get(`costs-${variant}`, {});
+    saved[inp.dataset.id] = +inp.value || 0; store.set(`costs-${variant}`, saved);
+    updateTotals();
+  }));
+  updateTotals();
+}
+
+function updateTotals() {
+  const vals = [...document.querySelectorAll("#cost-rows input")].map((i) => +i.value || 0);
+  const sub = vals.reduce((a, b) => a + b, 0);
+  const scrap = sub * SCRAP;
+  const cash = sub + scrap;
+  const hours = +document.getElementById("hours").value || 0;
+  const rate = +document.getElementById("rate").value || 0;
+  const price = +document.getElementById("price").value || 0;
+  const all = cash + hours * rate;
+  const margin = price * 0.97 - all;
+  document.getElementById("c-scrap").textContent = `$${fmt(scrap, 2)}`;
+  document.getElementById("c-total").textContent = `$${fmt(cash, 2)}`;
+  document.getElementById("t-cash").textContent = `$${fmt(cash)}`;
+  document.getElementById("t-all").textContent = `$${fmt(all)}`;
+  const m = document.getElementById("t-margin");
+  m.textContent = `${margin < 0 ? "−" : ""}$${fmt(Math.abs(margin))}`;
+  m.className = "big " + (margin < 0 ? "bad" : "ok");
+}
+
+["hours", "rate", "price"].forEach((id) => {
+  const el = document.getElementById(id);
+  const v = store.get(`in-${id}`, null); if (v != null) el.value = v;
+  el.addEventListener("input", () => { store.set(`in-${id}`, el.value); updateTotals(); });
+});
+["explode", "lamp", "cutaway", "screen"].forEach((id) => document.getElementById(id).addEventListener("input", applyState));
+document.querySelectorAll("[data-view]").forEach((b) => b.addEventListener("click", () => setView(b.dataset.view)));
+function pickVariant(key) {
+  document.getElementById("v-full").setAttribute("aria-pressed", key === "full");
+  document.getElementById("v-lean").setAttribute("aria-pressed", key === "lean");
+  store.set("variant", key);
+  loadVariant(key);
+}
+document.getElementById("v-full").addEventListener("click", () => pickVariant("full"));
+document.getElementById("v-lean").addEventListener("click", () => pickVariant("lean"));
+
+init();
+const startVariant = store.get("variant", "full");
+document.getElementById("v-full").setAttribute("aria-pressed", startVariant === "full");
+document.getElementById("v-lean").setAttribute("aria-pressed", startVariant === "lean");
+if (document.fonts) document.fonts.ready.then(() => loadVariant(startVariant)); else loadVariant(startVariant);
+</script>
