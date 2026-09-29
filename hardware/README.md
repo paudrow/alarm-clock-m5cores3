@@ -6,6 +6,7 @@ Plans for taking the CoreS3 alarm clock (V1, the firmware in this repo) to custo
 | --- | --- |
 | [`DESIGN.md`](DESIGN.md) | Electronics: chip, screen, sound, red lamp, timekeeping, power, and the V1 → V4 plan |
 | [`BOM.md`](BOM.md) | Bill of materials for the V2 breadboard and for production (~1k units), one-time costs, and design-for-manufacture notes |
+| [`FIRST-BATCH.md`](FIRST-BATCH.md) | A lean plan for a first run of 10 at ~$200: display options, cost per unit, pricing and how not to go broke |
 | [`CERTIFICATION.md`](CERTIFICATION.md) | What's needed to sell it legally in the US, Canada, EU and UK, what it costs, and how to pass first time |
 | [`MANUFACTURING.md`](MANUFACTURING.md) | Enclosure construction, getting rid of plastics, finish, CNC design rules, uses for the 3D printer, assembly sequence, and how production scales |
 
@@ -46,6 +47,7 @@ Plans for taking the CoreS3 alarm clock (V1, the firmware in this repo) to custo
 
 ## Still open
 
+- **Screen for the first batch:** lean 2.41″ AMOLED all-in-one (recommended for the first 10), the 4.1″ AMOLED, or big LED digits with a knob. See `FIRST-BATCH.md`. Test tonight: can you read the CoreS3 from 10 ft? The 2.41″ digits are ~20% bigger.
 - V3 PCB: a carrier board for the T-Display-P4, or fully custom. Decide after V2.
 - Speaker: confirm the Tectonic BMR sounds good in a ~0.2 L printed test box, against the Dayton ND65.
 - Sandblast grit for the glass base.
