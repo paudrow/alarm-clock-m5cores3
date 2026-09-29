@@ -9,6 +9,9 @@ without CadQuery installed:
 Writes (both git-ignored; regenerate rather than edit):
   viewer/index.html     the viewer as a page, for publishing as a Claude artifact
   site/public/          the viewer as a standalone site, plus STL/STEP downloads and zips
+
+It also embeds ../../sim/clock.wasm, the clock firmware built for the browser by
+sim/build.py, which runs the model's touchscreen.
 """
 
 import base64
@@ -31,9 +34,13 @@ def write_viewer():
             reports[key] = json.load(f)
         with open(os.path.join(here, "out", key, "clock.glb"), "rb") as f:
             glbs[key] = base64.b64encode(f.read()).decode()
+    # The clock's firmware, compiled to WebAssembly by sim/build.py, drives the touchscreen
+    with open(os.path.join(here, "..", "..", "sim", "clock.wasm"), "rb") as f:
+        sim_wasm = base64.b64encode(f.read()).decode()
     with open(os.path.join(here, "viewer_template.html")) as f:
         html = (f.read().replace("/*REPORTS*/", json.dumps(reports, separators=(",", ":")))
-                .replace("/*GLB*/", json.dumps(glbs)))
+                .replace("/*GLB*/", json.dumps(glbs))
+                .replace("/*SIMWASM*/", json.dumps(sim_wasm)))
     with open(os.path.join(viewer, "index.html"), "w") as f:
         f.write(html)
 

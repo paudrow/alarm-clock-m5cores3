@@ -52,6 +52,20 @@ h1 .dot { color: var(--accent); }
 .bar > * { pointer-events: auto; }
 .explode-btn { flex: none; font: 800 14px var(--font-ui); letter-spacing: 0.02em; color: var(--on-accent); background: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 8px 14px; cursor: pointer; }
 .explode-btn:hover { filter: brightness(1.08); }
+.bar-actions { display: flex; gap: 8px; flex: none; }
+.interact-btn { font: 800 14px var(--font-ui); letter-spacing: 0.02em; color: var(--accent); background: var(--panel); border: 1px solid var(--accent); border-radius: 4px; padding: 8px 14px; cursor: pointer; }
+.interact-btn[aria-pressed="true"] { color: var(--on-accent); background: var(--accent); }
+.stage.interacting canvas { cursor: crosshair; }
+.stage.interacting.on-screen canvas { cursor: pointer; }
+.sim-hint { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); max-width: calc(100% - 24px); font-size: 13px; background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 4px; padding: 6px 10px; text-align: center; }
+.touch-wrap { background: #000; border-radius: 4px; padding: 6px; }
+#sim-canvas { display: block; width: 100%; height: auto; image-rendering: auto; touch-action: none; cursor: pointer; border-radius: 2px; }
+.sim-controls { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.sim-controls .seg button { font-size: 12px; padding: 5px 6px; }
+.sim-set { display: flex; gap: 6px; align-items: center; }
+.sim-set input { font: 13px var(--font-data); color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 3px; padding: 3px 4px; }
+.sim-set button, .link-btn { font: 600 13px var(--font-ui); color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 4px 10px; cursor: pointer; }
+.sim-error { color: var(--accent); font-size: 13px; margin: 8px 0 0; }
 .labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
 .lbl { position: absolute; transform: translate(-50%, -100%); display: flex; flex-direction: column; align-items: center; gap: 3px; white-space: nowrap; }
 .lbl span { font: 500 11px var(--font-data); color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 3px; padding: 2px 6px; }
@@ -146,8 +160,12 @@ code { font-family: var(--font-data); font-size: 12px; }
             <button type="button" data-view="side">Side</button>
             <button type="button" data-view="below">Below</button>
           </div>
-          <button type="button" class="explode-btn" id="explode-btn" aria-pressed="false">Explode</button>
+          <div class="bar-actions">
+            <button type="button" class="interact-btn" id="interact-btn" aria-pressed="false">Interact</button>
+            <button type="button" class="explode-btn" id="explode-btn" aria-pressed="false">Explode</button>
+          </div>
         </div>
+        <div class="sim-hint" id="sim-hint" hidden>Tap, hold and drag on the clock's screen. It's running the real firmware. Press Done or Esc to leave.</div>
       </div>
     </div>
 
@@ -169,6 +187,34 @@ code { font-family: var(--font-data); font-size: 12px; }
           <label class="toggle"><input type="checkbox" id="screen" checked> Screen on</label>
           <label class="toggle"><input type="checkbox" id="colour"> Colour parts</label>
         </div>
+      </section>
+
+      <section class="card" aria-labelledby="h-touch">
+        <h2 id="h-touch">Touchscreen</h2>
+        <div class="touch-wrap"><canvas id="sim-canvas" width="616" height="284" aria-label="The clock's touchscreen, running the firmware. Click to tap it."></canvas></div>
+        <p class="sim-error" id="sim-error" hidden></p>
+        <dl class="kv">
+          <dt>Clock time</dt><dd id="sim-time">–</dd>
+          <dt>Screen</dt><dd id="sim-res">–</dd>
+          <dt>Brightness</dt><dd id="sim-bright">–</dd>
+        </dl>
+        <div class="sim-controls">
+          <div class="seg" role="group" aria-label="Clock speed">
+            <button type="button" data-speed="1" aria-pressed="true">Real time</button>
+            <button type="button" data-speed="60" aria-pressed="false">60×</button>
+            <button type="button" data-speed="600" aria-pressed="false">600×</button>
+          </div>
+          <div class="sim-set">
+            <label for="sim-set">Set the clock to</label>
+            <input type="time" id="sim-set" step="1" value="06:59:50">
+            <button type="button" id="sim-set-btn">Set</button>
+          </div>
+          <div class="toggles" style="margin-top:0">
+            <label class="toggle"><input type="checkbox" id="sim-sound" checked> Sound</label>
+            <button type="button" class="link-btn" id="sim-reset">Reset its settings</button>
+          </div>
+        </div>
+        <p class="note">This is the clock's real firmware, <code>src/main.cpp</code>, compiled to WebAssembly. It draws here and on the model's screen. Click here, or press Interact to use the screen on the model. Settings you change are kept in this browser, the way the clock keeps them through a power cut. To hear the alarm, turn it on, then set the clock to just before it.</p>
       </section>
 
       <section class="card" aria-labelledby="h-fit">
@@ -582,6 +628,17 @@ function init() {
   setView("three", true);
   renderer.domElement.addEventListener("pointermove", onHover);
   renderer.domElement.addEventListener("pointerleave", () => { hover.hidden = true; });
+  renderer.domElement.addEventListener("pointerdown", (e) => {
+    if (!interacting) return;
+    const pt = modelPoint(e);
+    if (!pt) return;
+    sim.ensureAudio(); modelDown = true; lastModelPt = pt;
+    renderer.domElement.setPointerCapture(e.pointerId);
+    sim.press(pt[0], pt[1], true); e.preventDefault();
+  });
+  const modelUp = () => { if (!modelDown) return; modelDown = false; sim.press(lastModelPt[0], lastModelPt[1], false); };
+  renderer.domElement.addEventListener("pointerup", modelUp);
+  renderer.domElement.addEventListener("pointercancel", modelUp);
   animate();
 }
 
@@ -654,6 +711,8 @@ function showVariant(key) {
   nodes = c.nodes;
   screenPlane = c.screenPlane;
   Object.values(nodes).forEach((o) => root.add(o));
+  if (interacting) exitInteract();
+  startSimFor(key);
   buildLabels();
   const g = rep.geometry;
   const gc = g.glass_center || [0, 0];
@@ -734,7 +793,7 @@ function applyState() {
   lampLight.position.set(gc[0], 8 + (glassNode ? glassNode.position.z : 0), -gc[1]);
   wash.visible = lamp && ex < 0.05;
   if (screenPlane) screenPlane.visible = scr;
-  controls.target.set(baseTarget.x, baseTarget.y + (variant === "bench" ? 30 : 22) * ex, baseTarget.z);
+  if (!interacting) controls.target.set(baseTarget.x, baseTarget.y + (variant === "bench" ? 30 : 22) * ex, baseTarget.z);
   const btn = document.getElementById("explode-btn");
   btn.textContent = ex > 0.5 ? "Assemble" : "Explode";
   btn.setAttribute("aria-pressed", ex > 0.5);
@@ -787,6 +846,7 @@ function explodeTo(target) {
   })(t0);
 }
 document.getElementById("explode-btn").addEventListener("click", () => {
+  if (interacting) exitInteract();
   const out = +document.getElementById("explode").value < 50;
   explodeTo(out ? 100 : 0);
   setView(out ? "exploded" : "three");
@@ -794,7 +854,282 @@ document.getElementById("explode-btn").addEventListener("click", () => {
 
 const ray = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
+
+// ---------- firmware simulator ----------
+// src/main.cpp compiled to WebAssembly (sim/build.py) against a stand-in for M5Unified
+// (sim/shim/). Its drawing, sound, clock and settings calls land in these functions.
+const SIM_WASM = /*SIMWASM*/;
+const SIM_RES = { bench: [616, 284], full: [616, 284], lean: [600, 450] }; // each screen's aspect, at CoreS3-like pixel density
+const FONT_H = { 0: 8, 2: 16, 4: 26, 6: 48, 7: 48, 8: 75 };
+const SEG = { "0": "abcdef", "1": "bc", "2": "abged", "3": "abgcd", "4": "fgbc", "5": "afgcd", "6": "afgedc", "7": "abc", "8": "abcdefg", "9": "abcdfg", "-": "g", " ": "" };
+const rgb565 = (c) => `rgb(${((c >> 11) & 31) * 255 / 31 | 0},${((c >> 5) & 63) * 255 / 63 | 0},${(c & 31) * 255 / 31 | 0})`;
+function simFont(font, size) {
+  const h = (FONT_H[font] || 8) * size;
+  if (font === 8 || font === 6) return { css: `600 ${Math.round(h * 1.32)}px "Chivo Mono", ui-monospace, monospace`, px: h * 1.32 };
+  if (font === 0) return { css: `${Math.round(h)}px ui-monospace, monospace`, px: h };
+  return { css: `600 ${Math.round(h)}px "Chivo", Arial, sans-serif`, px: h };
+}
+const sevenAdvance = (ch, s) => (ch === ":" || ch === ".") ? 12 * s : 32 * s;
+function drawSeven(ctx, text, x, y, s) {
+  const w = 26 * s, h = 46 * s, t = 5 * s, half = h / 2;
+  let cx = x;
+  for (const ch of text) {
+    if (ch === ":") { ctx.fillRect(cx + 3 * s, y + h * 0.28, t, t); ctx.fillRect(cx + 3 * s, y + h * 0.64, t, t); }
+    else if (ch === ".") { ctx.fillRect(cx + 3 * s, y + h - t, t, t); }
+    else {
+      const on = SEG[ch] || "";
+      const seg = { a: [t, 0, w - 2 * t, t], b: [w - t, t, t, half - 1.5 * t], c: [w - t, half + 0.5 * t, t, half - 1.5 * t],
+        d: [t, h - t, w - 2 * t, t], e: [0, half + 0.5 * t, t, half - 1.5 * t], f: [0, t, t, half - 1.5 * t], g: [t, half - t / 2, w - 2 * t, t] };
+      for (const k of on) { const r = seg[k]; ctx.fillRect(cx + r[0], y + r[1], r[2], r[3]); }
+    }
+    cx += sevenAdvance(ch, s);
+  }
+}
+
+class ClockSim {
+  constructor(canvas) {
+    this.canvas = canvas; this.ctx = canvas.getContext("2d");
+    this.module = null; this.inst = null; this.error = null;
+    this.speed = 1; this.base = Date.now(); this.basePerf = performance.now(); this.offset = 0;
+    this.brightness = 255; this.dirty = true; this.queue = []; this.touch = { x: 0, y: 0, down: false };
+    this.sound = true; this.audio = null; this.voice = null; this.onBrightness = null;
+  }
+  nowMs() { return this.base + (performance.now() - this.basePerf) * this.speed + this.offset; }
+  setSpeed(s) { const now = this.nowMs(); this.speed = s; this.base = now; this.basePerf = performance.now(); this.offset = 0; }
+  setClock(h, m, sec) { const d = new Date(this.nowMs()); d.setHours(h, m, sec || 0, 0); this.offset += d.getTime() - this.nowMs(); }
+  ensureAudio() {
+    try {
+      if (!this.audio) this.audio = new (window.AudioContext || window.webkitAudioContext)();
+      if (this.audio.state === "suspended") this.audio.resume();
+    } catch (e) { this.audio = null; }
+  }
+  stopTone() { if (this.voice) { try { this.voice.osc.stop(); } catch (e) {} this.voice = null; } }
+  tone(freq, ms, vol) {
+    this.stopTone();
+    if (!this.sound || !this.audio || this.audio.state !== "running") return;
+    const a = this.audio, t = a.currentTime;
+    const osc = a.createOscillator(), gain = a.createGain();
+    osc.type = "square"; osc.frequency.value = freq;
+    const level = Math.pow(vol / 255, 2) * 0.12;
+    gain.gain.setValueAtTime(0, t); gain.gain.linearRampToValueAtTime(level, t + 0.005);
+    gain.gain.setValueAtTime(level, t + ms / 1000 - 0.01); gain.gain.linearRampToValueAtTime(0, t + ms / 1000);
+    osc.connect(gain).connect(a.destination); osc.start(t); osc.stop(t + ms / 1000 + 0.02);
+    this.voice = { osc };
+  }
+  boot(w, h) {
+    this.w = w; this.h = h; this.error = null;
+    this.canvas.width = w; this.canvas.height = h;
+    this.ctx.fillStyle = "#000"; this.ctx.fillRect(0, 0, w, h);
+    this.stopTone(); this.queue = []; this.touch = { x: 0, y: 0, down: false };
+    if (!this.module) {
+      const bin = atob(SIM_WASM); const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      this.module = new WebAssembly.Module(bytes);
+    }
+    const self = this, ctx = this.ctx, dec = new TextDecoder();
+    let mem = null;
+    const str = (p, n) => dec.decode(new Uint8Array(mem.buffer, p, n));
+    const measure = (text, font, size) => {
+      if (font === 7) { let wsum = 0; for (const ch of text) wsum += sevenAdvance(ch, size); return Math.round(wsum); }
+      ctx.font = simFont(font, size).css; return Math.round(ctx.measureText(text).width);
+    };
+    const prefKey = (p, n) => "clocksim:" + str(p, n);
+    const env = {
+      js_fill_rect(x, y, w2, h2, c) { ctx.fillStyle = rgb565(c); ctx.fillRect(x, y, w2, h2); self.dirty = true; },
+      js_draw_rect(x, y, w2, h2, c) { ctx.strokeStyle = rgb565(c); ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, y + 0.5, w2 - 1, h2 - 1); self.dirty = true; },
+      js_draw_line(x0, y0, x1, y1, c) { ctx.strokeStyle = rgb565(c); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x0 + 0.5, y0 + 0.5); ctx.lineTo(x1 + 0.5, y1 + 0.5); ctx.stroke(); self.dirty = true; },
+      js_draw_circle(x, y, r, c) { ctx.strokeStyle = rgb565(c); ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x + 0.5, y + 0.5, r, 0, Math.PI * 2); ctx.stroke(); self.dirty = true; },
+      js_fill_circle(x, y, r, c) { ctx.fillStyle = rgb565(c); ctx.beginPath(); ctx.arc(x + 0.5, y + 0.5, r + 0.5, 0, Math.PI * 2); ctx.fill(); self.dirty = true; },
+      js_draw_string(p, n, x, y, datum, fg, bg, font, size) {
+        const text = str(p, n), tw = measure(text, font, size), fh = Math.round((FONT_H[font] || 8) * size);
+        const xa = datum & 3, ya = (datum >> 2) & 3;
+        const left = x - (xa === 1 ? tw / 2 : xa === 2 ? tw : 0);
+        const top = datum >= 16 ? y - fh * 0.8 : y - (ya === 1 ? fh / 2 : ya === 2 ? fh : 0);
+        if (bg >= 0 && bg !== fg) { ctx.fillStyle = rgb565(bg); ctx.fillRect(Math.floor(left), Math.floor(top), Math.ceil(tw) + 1, fh); }
+        ctx.fillStyle = rgb565(fg);
+        if (font === 7) drawSeven(ctx, text, left, top + (fh - 46 * size) / 2, size);
+        else {
+          const f = simFont(font, size);
+          ctx.font = f.css; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+          ctx.fillText(text, left, top + fh / 2 + f.px * 0.36);
+        }
+        self.dirty = true;
+      },
+      js_text_width(p, n, font, size) { return measure(str(p, n), font, size); },
+      js_font_height(font, size) { return Math.round((FONT_H[font] || 8) * size); },
+      js_set_brightness(v) { if (v !== self.brightness) { self.brightness = v; if (self.onBrightness) self.onBrightness(v); } },
+      js_tone(freq, ms, vol) { self.tone(freq, ms, vol); },
+      js_stop_tone() { self.stopTone(); },
+      js_millis() { return performance.now() - self.bootPerf; },
+      js_get_time(p) {
+        const d = new Date(self.nowMs());
+        new Int32Array(mem.buffer, p, 6).set([d.getFullYear(), d.getMonth() + 1, d.getDate(), d.getHours(), d.getMinutes(), d.getSeconds()]);
+      },
+      js_set_time(y, mo, d, h, mi, sec) { self.offset += new Date(y, mo - 1, d, h, mi, sec).getTime() - self.nowMs(); },
+      js_log(p, n) { console.debug("[clock]", str(p, n)); },
+      js_pref_get(k, kl, buf, cap) {
+        let v = null; try { v = localStorage.getItem(prefKey(k, kl)); } catch (e) {}
+        if (!v) return 0;
+        const raw = atob(v); const len = Math.min(cap, raw.length); const out = new Uint8Array(mem.buffer, buf, len);
+        for (let i = 0; i < len; i++) out[i] = raw.charCodeAt(i);
+        return len;
+      },
+      js_pref_set(k, kl, buf, n) {
+        const b = new Uint8Array(mem.buffer, buf, n); let raw = "";
+        for (let i = 0; i < n; i++) raw += String.fromCharCode(b[i]);
+        try { localStorage.setItem(prefKey(k, kl), btoa(raw)); } catch (e) {}
+      }
+    };
+    this.bootPerf = performance.now();
+    this.inst = new WebAssembly.Instance(this.module, { env });
+    mem = this.inst.exports.memory;
+    this.inst.exports._initialize();
+    this.inst.exports.sim_init(w, h);
+    this.dirty = true;
+  }
+  // Queue touches; frame() hands them to the firmware one state change per loop, so a quick tap is never lost.
+  press(x, y, down) { this.queue.push({ x: Math.max(0, Math.min(this.w - 1, x)), y: Math.max(0, Math.min(this.h - 1, y)), down }); }
+  frame() {
+    if (!this.inst || this.error) return;
+    if (this.queue.length) {
+      const ev = this.queue.shift();
+      while (this.queue.length && this.queue[0].down === ev.down) Object.assign(ev, this.queue.shift());
+      this.touch = ev;
+    }
+    try {
+      this.inst.exports.sim_touch(this.touch.x | 0, this.touch.y | 0, this.touch.down ? 1 : 0);
+      this.inst.exports.sim_loop();
+    } catch (err) {
+      this.error = err; this.stopTone();
+      const el = document.getElementById("sim-error");
+      el.textContent = `The firmware stopped: ${err.message}. Reload the page to restart it.`; el.hidden = false;
+    }
+  }
+  resetSettings() {
+    try { Object.keys(localStorage).filter((k) => k.startsWith("clocksim:")).forEach((k) => localStorage.removeItem(k)); } catch (e) {}
+    this.boot(this.w, this.h);
+  }
+}
+
+const simCanvas = document.getElementById("sim-canvas");
+const sim = new ClockSim(simCanvas);
+let simTexture = null, simKey = null;
+function simBrightnessScale() { return 0.12 + 0.88 * sim.brightness / 255; }
+sim.onBrightness = () => {
+  if (screenPlane && screenPlane.material.map === simTexture) screenPlane.material.color.setScalar(simBrightnessScale());
+  simCanvas.style.filter = `brightness(${simBrightnessScale().toFixed(2)})`;
+};
+function startSimFor(key) {
+  const [w, h] = SIM_RES[key];
+  if (!simTexture || sim.w !== w || sim.h !== h) {
+    sim.boot(w, h);
+    if (simTexture) simTexture.dispose();
+    simTexture = new THREE.CanvasTexture(simCanvas);
+    simTexture.encoding = THREE.sRGBEncoding;
+    simTexture.anisotropy = 8;
+  }
+  simKey = key;
+  if (screenPlane) {
+    screenPlane.material.map = simTexture;
+    screenPlane.material.color.setScalar(simBrightnessScale());
+    screenPlane.material.needsUpdate = true;
+  }
+  document.getElementById("sim-res").textContent = `${w} × ${h} px, drawn by the firmware`;
+  sim.onBrightness();
+}
+function simTick() {
+  sim.frame();
+  if (sim.dirty && simTexture) { simTexture.needsUpdate = true; sim.dirty = false; }
+}
+setInterval(() => {
+  if (!sim.inst) return;
+  const d = new Date(sim.nowMs());
+  document.getElementById("sim-time").textContent = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) + (sim.speed > 1 ? ` (${sim.speed}×)` : "");
+  document.getElementById("sim-bright").textContent = `${Math.round(sim.brightness / 2.55)}%`;
+}, 250);
+
+// Touch on the 2D panel
+let panelDown = false;
+function panelPoint(e) { const r = simCanvas.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * sim.w, (e.clientY - r.top) / r.height * sim.h]; }
+simCanvas.addEventListener("pointerdown", (e) => { sim.ensureAudio(); panelDown = true; simCanvas.setPointerCapture(e.pointerId); sim.press(...panelPoint(e), true); e.preventDefault(); });
+simCanvas.addEventListener("pointermove", (e) => { if (panelDown) sim.press(...panelPoint(e), true); });
+const panelUp = (e) => { if (!panelDown) return; panelDown = false; sim.press(...panelPoint(e), false); };
+simCanvas.addEventListener("pointerup", panelUp);
+simCanvas.addEventListener("pointercancel", panelUp);
+
+document.querySelectorAll("[data-speed]").forEach((b) => b.addEventListener("click", () => {
+  sim.setSpeed(+b.dataset.speed);
+  document.querySelectorAll("[data-speed]").forEach((x) => x.setAttribute("aria-pressed", x === b));
+}));
+document.getElementById("sim-set-btn").addEventListener("click", () => {
+  const v = document.getElementById("sim-set").value;
+  if (!v) return;
+  const [h, m, sec] = v.split(":").map(Number);
+  sim.setClock(h, m, sec || 0);
+});
+document.getElementById("sim-sound").addEventListener("change", (e) => { sim.sound = e.target.checked; if (sim.sound) sim.ensureAudio(); else sim.stopTone(); });
+document.getElementById("sim-reset").addEventListener("click", () => sim.resetSettings());
+
+// ---------- Interact: fly to the model's screen and touch it ----------
+let interacting = false, savedCam = null, modelDown = false, lastModelPt = [0, 0];
+const interactBtn = document.getElementById("interact-btn");
+function flyTo(pos, target, done) {
+  const p0 = camera.position.clone(), t0v = controls.target.clone(), start = performance.now();
+  const dur = reduceMotion ? 0 : 750;
+  (function step(now) {
+    const k = dur ? Math.min((now - start) / dur, 1) : 1; const e = k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+    camera.position.lerpVectors(p0, pos, e); controls.target.lerpVectors(t0v, target, e); camera.lookAt(controls.target);
+    if (k < 1) requestAnimationFrame(step); else if (done) done();
+  })(start);
+}
+function enterInteract() {
+  if (!screenPlane) return;
+  const slider = document.getElementById("explode");
+  if (+slider.value > 0) { slider.value = 0; }
+  document.getElementById("screen").checked = true;
+  interacting = true; applyState();
+  controls.enabled = false; hover.hidden = true;
+  savedCam = { pos: camera.position.clone(), target: controls.target.clone() };
+  screenPlane.updateMatrixWorld(true);
+  const c = new THREE.Vector3(); screenPlane.getWorldPosition(c);
+  const n = new THREE.Vector3(0, 0, 1).applyQuaternion(screenPlane.getWorldQuaternion(new THREE.Quaternion())).normalize();
+  const [aw, ah] = REPORTS[variant].geometry.active;
+  const vfov = camera.fov * Math.PI / 180, hfov = 2 * Math.atan(Math.tan(vfov / 2) * camera.aspect);
+  const dist = Math.max((aw / 2) / (0.84 * Math.tan(hfov / 2)), (ah / 2) / (0.78 * Math.tan(vfov / 2)));
+  flyTo(c.clone().add(n.multiplyScalar(dist)), c);
+  interactBtn.textContent = "Done"; interactBtn.setAttribute("aria-pressed", "true");
+  document.getElementById("sim-hint").hidden = false;
+  document.getElementById("vlabel").hidden = true;
+  stage.classList.add("interacting");
+}
+function exitInteract() {
+  if (!interacting) return;
+  if (modelDown) { modelDown = false; sim.press(lastModelPt[0], lastModelPt[1], false); }
+  interacting = false;
+  interactBtn.textContent = "Interact"; interactBtn.setAttribute("aria-pressed", "false");
+  document.getElementById("sim-hint").hidden = true;
+  document.getElementById("vlabel").hidden = false;
+  stage.classList.remove("interacting", "on-screen");
+  const back = savedCam;
+  flyTo(back ? back.pos : camera.position.clone(), back ? back.target : baseTarget.clone(), () => { controls.enabled = true; applyState(); });
+}
+interactBtn.addEventListener("click", () => { sim.ensureAudio(); interacting ? exitInteract() : enterInteract(); });
+addEventListener("keydown", (e) => { if (e.key === "Escape") exitInteract(); });
+function modelPoint(e) {
+  const r = renderer.domElement.getBoundingClientRect();
+  mouse.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(mouse, camera);
+  const hit = screenPlane ? ray.intersectObject(screenPlane, false)[0] : null;
+  return hit && hit.uv ? [hit.uv.x * sim.w, (1 - hit.uv.y) * sim.h] : null;
+}
+
 function onHover(e) {
+  if (interacting) {
+    const pt = modelPoint(e);
+    stage.classList.toggle("on-screen", !!pt);
+    if (modelDown && pt) { lastModelPt = pt; sim.press(pt[0], pt[1], true); }
+    return;
+  }
   const r = renderer.domElement.getBoundingClientRect();
   mouse.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
   ray.setFromCamera(mouse, camera);
@@ -817,6 +1152,7 @@ function flash(name) {
 
 function animate() {
   requestAnimationFrame(animate);
+  simTick();
   controls.update();
   renderer.render(scene, camera);
   placeLabels();
