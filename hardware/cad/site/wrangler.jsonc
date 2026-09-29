@@ -1,0 +1,14 @@
+{
+  // Static site for the 3D viewer, served by Cloudflare Workers (assets only, no code).
+  // Deploy from this folder with: npx wrangler deploy
+  "name": "alarmclock-site",
+  "compatibility_date": "2026-09-29",
+  "assets": {
+    "directory": "./public"
+  },
+  // Cloudflare creates the DNS record and certificate for this hostname on deploy.
+  // The domain must be a zone in the same Cloudflare account.
+  "routes": [
+    { "pattern": "alarmclock.audrow.com", "custom_domain": true }
+  ]
+}

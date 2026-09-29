@@ -1,0 +1,375 @@
+{
+  "variant": {
+    "key": "full",
+    "label": "V3 enclosure, 4.1\" AMOLED (T-Display-P4)",
+    "screen_w": 103.8,
+    "screen_h": 51.3,
+    "screen_d": 12.3,
+    "active_w": 94.5,
+    "active_h": 43.6,
+    "screen_measured": true,
+    "tube_len": 130.0,
+    "kind": "enclosure",
+    "version": "V3"
+  },
+  "kind": "enclosure",
+  "geometry": {
+    "overall_w": 142.7,
+    "overall_h": 92.49999999999999,
+    "overall_d": 76.19999999999999,
+    "window": [
+      96.0,
+      45.1
+    ],
+    "active": [
+      94.5,
+      43.6
+    ],
+    "screen_center": [
+      0,
+      -34.425,
+      52.8
+    ],
+    "active_center": [
+      0,
+      -34.425,
+      52.8
+    ],
+    "glass": [
+      132.0,
+      76.19999999999999,
+      12.7
+    ],
+    "tube_len": 130.0,
+    "cap_blank": [
+      76.19999999999999,
+      90.89999999999999,
+      6.35
+    ],
+    "speaker_center": [
+      0,
+      33.925,
+      60.7
+    ],
+    "lamp_slot": [
+      90.0,
+      6.0,
+      -12.0
+    ],
+    "chamber_box": [
+      123.0,
+      33.025,
+      53.74999999999999
+    ],
+    "screen_node": "screen",
+    "screen_tilt": 0.0,
+    "glass_center": [
+      0,
+      0
+    ],
+    "glass_node": "glass_base",
+    "led_node": "leds",
+    "view_target": [
+      0,
+      0,
+      46
+    ],
+    "cutaway": [
+      "tube",
+      "cap_left",
+      "button"
+    ]
+  },
+  "notes": {
+    "leds_on_pcb": true
+  },
+  "clashes": [],
+  "chamber_litres": 0.19,
+  "parts": {
+    "tube": {
+      "label": "Body",
+      "material": "6063-T52 square tube, black anodized",
+      "look": "alu_black",
+      "explode": [
+        0,
+        0,
+        110
+      ],
+      "volume_mm3": 102596.2,
+      "mass_g": 277.0,
+      "bbox": [
+        130.0,
+        76.2,
+        76.2
+      ],
+      "printable": false,
+      "print_g": null
+    },
+    "cap_left": {
+      "label": "End cap, button side",
+      "material": "6061 bar, black anodized",
+      "look": "alu_black",
+      "explode": [
+        -75,
+        0,
+        0
+      ],
+      "volume_mm3": 44533.6,
+      "mass_g": 120.2,
+      "bbox": [
+        9.35,
+        76.2,
+        90.9
+      ],
+      "printable": false,
+      "print_g": null
+    },
+    "cap_right": {
+      "label": "End cap, USB-C side",
+      "material": "6061 bar, black anodized",
+      "look": "alu_black",
+      "explode": [
+        75,
+        0,
+        0
+      ],
+      "volume_mm3": 44603.8,
+      "mass_g": 120.4,
+      "bbox": [
+        9.35,
+        76.2,
+        90.9
+      ],
+      "printable": false,
+      "print_g": null
+    },
+    "button": {
+      "label": "Snooze / stop button",
+      "material": "6061, black anodized",
+      "look": "alu_black",
+      "explode": [
+        -105,
+        0,
+        0
+      ],
+      "volume_mm3": 326.1,
+      "mass_g": 0.9,
+      "bbox": [
+        4.2,
+        10.0,
+        10.0
+      ],
+      "printable": false,
+      "print_g": null
+    },
+    "glass_base": {
+      "label": "Glass base",
+      "material": "1/2\" low-iron glass, sandblasted underside",
+      "look": "glass",
+      "explode": [
+        0,
+        0,
+        -45
+      ],
+      "volume_mm3": 127671.3,
+      "mass_g": 319.2,
+      "bbox": [
+        132.0,
+        76.2,
+        12.7
+      ],
+      "printable": false,
+      "print_g": null
+    },
+    "screen": {
+      "label": "Screen module",
+      "material": "AMOLED panel + board",
+      "look": "screen",
+      "explode": [
+        0,
+        -95,
+        0
+      ],
+      "volume_mm3": 65496.8,
+      "mass_g": null,
+      "bbox": [
+        103.8,
+        12.3,
+        51.3
+      ],
+      "printable": false,
+      "print_g": null
+    },
+    "screen_frame": {
+      "label": "Screen retaining frame",
+      "material": "5052 aluminium",
+      "look": "alu_raw",
+      "explode": [
+        0,
+        -55,
+        0
+      ],
+      "volume_mm3": 3626.4,
+      "mass_g": 9.8,
+      "bbox": [
+        107.8,
+        2.0,
+        55.3
+      ],
+      "printable": false,
+      "print_g": null
+    },
+    "sled": {
+      "label": "Sled",
+      "material": "5052 sheet",
+      "look": "alu_raw",
+      "explode": [
+        0,
+        0,
+        -22
+      ],
+      "volume_mm3": 12501.2,
+      "mass_g": 33.8,
+      "bbox": [
+        123.0,
+        67.85,
+        1.6
+      ],
+      "printable": false,
+      "print_g": null
+    },
+    "pcb": {
+      "label": "Carrier PCB",
+      "material": "FR-4, matte black",
+      "look": "pcb",
+      "explode": [
+        0,
+        0,
+        0
+      ],
+      "volume_mm3": 10180.0,
+      "mass_g": null,
+      "bbox": [
+        125.0,
+        50.9,
+        1.6
+      ],
+      "printable": false,
+      "print_g": null
+    },
+    "standoffs": {
+      "label": "Standoffs",
+      "material": "M3 aluminium",
+      "look": "alu_raw",
+      "explode": [
+        0,
+        0,
+        -10
+      ],
+      "volume_mm3": 392.7,
+      "mass_g": 1.1,
+      "bbox": [
+        118.0,
+        47.9,
+        5.0
+      ],
+      "printable": false,
+      "print_g": null
+    },
+    "usb_c": {
+      "label": "USB-C receptacle",
+      "material": "",
+      "look": "steel",
+      "explode": [
+        0,
+        0,
+        6
+      ],
+      "volume_mm3": 216.0,
+      "mass_g": null,
+      "bbox": [
+        7.5,
+        9.0,
+        3.2
+      ],
+      "printable": false,
+      "print_g": null
+    },
+    "leds": {
+      "label": "660 nm LEDs",
+      "material": "OSRAM OSCONIQ P 3030",
+      "look": "led",
+      "explode": [
+        0,
+        0,
+        -12
+      ],
+      "volume_mm3": 21.6,
+      "mass_g": null,
+      "bbox": [
+        63.0,
+        3.0,
+        0.6
+      ],
+      "printable": false,
+      "print_g": null
+    },
+    "chamber": {
+      "label": "Speaker chamber",
+      "material": "5052 sheet",
+      "look": "alu_raw",
+      "explode": [
+        0,
+        40,
+        38
+      ],
+      "volume_mm3": 17392.2,
+      "mass_g": 47.0,
+      "bbox": [
+        123.0,
+        34.62,
+        55.35
+      ],
+      "printable": false,
+      "print_g": null
+    },
+    "speaker": {
+      "label": "Speaker",
+      "material": "Tectonic TEBM35C10-4",
+      "look": "speaker",
+      "explode": [
+        0,
+        95,
+        38
+      ],
+      "volume_mm3": 28313.3,
+      "mass_g": null,
+      "bbox": [
+        52.0,
+        25.1,
+        52.0
+      ],
+      "printable": false,
+      "print_g": null
+    },
+    "feet": {
+      "label": "Cork feet",
+      "material": "natural cork",
+      "look": "cork",
+      "explode": [
+        0,
+        0,
+        -62
+      ],
+      "volume_mm3": 181.0,
+      "mass_g": 0.0,
+      "bbox": [
+        142.35,
+        60.0,
+        1.6
+      ],
+      "printable": false,
+      "print_g": null
+    }
+  }
+}
