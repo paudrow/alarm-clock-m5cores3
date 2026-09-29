@@ -9,6 +9,6 @@
   // Cloudflare creates the DNS record and certificate for this hostname on deploy.
   // The domain must be a zone in the same Cloudflare account.
   "routes": [
-    { "pattern": "alarmclock.audro.com", "custom_domain": true }
+    { "pattern": "alarmclock.audrow.com", "custom_domain": true }
   ]
 }
