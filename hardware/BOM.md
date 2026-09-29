@@ -6,7 +6,7 @@ Three buying lists, then the costs:
 2. **Enclosure prototype:** metal, glass, hardware, finishing and tooling for the first shop-built case.
 3. **Production electronics:** exact parts with LCSC numbers for JLCPCB assembly.
 4. **Prototype budget:** what each later stage (V3, V4, a pilot batch) is likely to cost.
-5. **Production cost estimate:** per unit at ~1,000 units, plus one-time costs.
+5. **Production cost estimate:** per unit at ~1,000 units, then **unit cost at 10 / 100 / 1,000 / 10,000 units**, plus one-time costs.
 
 **How far these are checked.** Every part number and product link below appeared in web-search results for that exact product page. The vendor sites themselves couldn't be opened from here.
 - Prices are from search snippets, so treat them as close but **re-check price and stock in the cart**.
@@ -225,15 +225,15 @@ This is the cheapest way to a working clock in a real aluminium case.
 | 15 clocks | $1,650–2,400 | |
 | Test fixture and jigs (mostly printed) | $200–500 | |
 | EMC pre-compliance scan at a lab (a few hours) | $500–1,500 | Catches problems before the real test |
-| FCC Part 15B + CE EMC certification | $3,000–6,000 | Needed before selling. No radio, so no FCC ID and no radio testing. |
-| **Total** | **≈ $5,300–10,400** | |
+| FCC Part 15B + ICES-003 (US + Canada) | $1,500–3,000 | Needed before selling; see `CERTIFICATION.md`. EU/UK comes later. |
+| **Total** | **≈ $3,850–7,400** | |
 
 ### Running total to a first sellable batch
 
 | Path | ≈ Cash |
 | --- | --- |
-| V2 → V3 (a) carrier → pilot of 15 | **$6,500–12,000** |
-| V2 → V3 (a) → V3 (b) custom → pilot of 15 | **$7,800–14,500** |
+| V2 → V3 (a) carrier → pilot of 15 | **$5,000–9,000** |
+| V2 → V3 (a) → V3 (b) custom → pilot of 15 | **$6,300–11,600** |
 
 Certification and the pilot batch are most of it. **The prototypes themselves are about $1,200–1,750** (V2 + carrier V3), or up to ~$4,200 if you also build the custom board.
 
@@ -309,6 +309,34 @@ Construction is tube + two end caps + an internal sled; see `MANUFACTURING.md`. 
 
 Hardware usually retails at 3–5× BOM, so this lands in high-end nightstand territory ($199–349) with healthy margin.
 
+### Unit cost by volume
+
+The same design at four volumes. How it gets made changes along the way, and that drives most of the drop:
+
+| | 10 | 100 | 1,000 | 10,000 |
+| --- | --- | --- | --- | --- |
+| **How it's made** | Your shop; PCBs assembled by JLCPCB; glass cut singly | Your CNC with fixtures; JLCPCB; glass bought in batches | Case parts machined by a job shop; panels bought in bulk | Custom extrusion, cast or forged caps; a contract manufacturer (CM) builds it |
+| Main PCB, assembled | $40–55 | $25–30 | $20–24 | $15–18 |
+| AMOLED panel + touch + cover glass | $40–60 | $30–45 | $15–35 | $12–25 |
+| Enclosure (materials, glass base, anodizing, hardware) | $70–100 | $30–40 | $19–37 | $12–20 |
+| Speaker | $10 | $7–9 | $4–7 | $3–5 |
+| Box, cable, insert | $10–20 | $8–12 | $6–10 | $4–7 |
+| Freight in, import duties | $10–15 | $5–10 | $4–8 | $3–6 |
+| Final assembly + test | your time | your time | $10–15 (hired help) | $4–6 (CM) |
+| Scrap allowance (3–5%) | $5–10 | $4–6 | $3–5 | $2–3 |
+| **Cash cost per unit** | **$185–270** | **$110–150** | **$80–140** | **$55–90** |
+| Your shop time per unit | ~2.5 h | ~1.25 h | — | — |
+| **Including your time at $40/h** | **$285–370** | **$160–200** | **$80–140** | **$55–90** |
+| One-time costs spread per unit (certification, fixtures, cover-glass setup; at 10k also the extrusion die and cap tooling) | ~$300–450 | ~$30–45 | ~$5 | ~$1–2 |
+
+Notes:
+- **The panel is the biggest unknown** at every volume. Get real quotes early, since they move these numbers more than anything else.
+- **At 10 units,** building on the T-Display-P4 (carrier route) instead of the custom board costs about **$230–300 cash** per unit. That's still a sensible way to make the first 10.
+- **Import duties** on Chinese-made boards and panels have changed repeatedly since 2025. Check the current rate before pricing; it can move the 1,000 and 10,000 figures by 10–30%.
+- **What it means for price:**
+  - Selling direct from your own site, you want roughly **2× cost** or more. At ~$299 that works from about 100 units.
+  - Through retailers, who take 40–50%, you want **4–5× cost**. That only works from ~1,000 units up.
+
 ### One-time costs (rough)
 
 | Item | ≈ Cost |
@@ -316,7 +344,7 @@ Hardware usually retails at 3–5× BOM, so this lands in high-end nightstand te
 | Extrusion die (only at the small-production stage; stock tube until then) | $500–2,000 |
 | CNC fixtures, soft jaws, mandrel for window machining (mostly 3D printed or shop-made) | $100–500 |
 | Custom cover-lens print setup | $300–1,000 |
-| EMC testing: FCC Part 15B + CE (EMC) + ICES-003. No radio, so no FCC ID, no RED. | $3,000–6,000 |
+| Certification: FCC Part 15B + ICES-003 first ($1,500–3,000), EU/UK later ($5,000–10,000). See `CERTIFICATION.md`. | $1,500–13,000 |
 | Pogo-pin test fixture | $300–800 |
 | Prototype runs (2–3 PCB spins, CNC case samples) | $1,500–3,000 |
 
