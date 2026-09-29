@@ -20,12 +20,12 @@
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #141316; --panel: #1c1a1f; --stage: #242227; --fg: #ebe9e6; --muted: #a29ea8;
+    --bg: #141316; --panel: #1c1a1f; --stage: #3a3840; --fg: #ebe9e6; --muted: #a29ea8;
     --line: #322f36; --accent: #ff4757; --on-accent: #1b1a1d; --good: #6fcf97; --warn: #f2c94c; color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #141316; --panel: #1c1a1f; --stage: #242227; --fg: #ebe9e6; --muted: #a29ea8;
+  --bg: #141316; --panel: #1c1a1f; --stage: #3a3840; --fg: #ebe9e6; --muted: #a29ea8;
   --line: #322f36; --accent: #ff4757; --on-accent: #1b1a1d; --good: #6fcf97; --warn: #f2c94c; color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -151,6 +151,7 @@ code { font-family: var(--font-data); font-size: 12px; }
           <label class="toggle"><input type="checkbox" id="lamp" checked> Lamp on</label>
           <label class="toggle"><input type="checkbox" id="cutaway"> See inside</label>
           <label class="toggle"><input type="checkbox" id="screen" checked> Screen on</label>
+          <label class="toggle"><input type="checkbox" id="colour"> Colour parts</label>
         </div>
       </section>
 
@@ -241,6 +242,7 @@ const COSTS = {
 };
 const SCRAP = 0.03;
 
+const PART_COLOUR = { tube: "#5b6b82", cap_left: "#7f8fa6", cap_right: "#7f8fa6", button: "#c4a35a", glass_base: "#9fd3c7", screen: "#2d2d33", screen_frame: "#d9a066", sled: "#b8c4a0", pcb: "#4f8a5b", standoffs: "#c9ccd1", usb_c: "#c9ccd1", leds: "#e0142c", chamber: "#a58cc9", speaker: "#d08a8a", feet: "#b58a5a" };
 const LOOK_SWATCH = { alu_black: "#1b1b1e", alu_raw: "#b9bcc0", glass: "#cfe3e0", screen: "#050505", pcb: "#16201b", steel: "#9a9da2", led: "#d0142a", speaker: "#2c2c2f", cork: "#a9825a" };
 
 const store = {
@@ -260,8 +262,8 @@ const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 function cssVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
 
 function makeMaterials() {
-  mats.alu_black = new THREE.MeshPhysicalMaterial({ color: 0x2c2c31, metalness: 0.45, roughness: 0.36, clearcoat: 0.3, clearcoatRoughness: 0.45, envMapIntensity: 1.3 });
-  mats.alu_raw = new THREE.MeshStandardMaterial({ color: 0xb9bcc0, metalness: 0.6, roughness: 0.35 });
+  mats.alu_black = new THREE.MeshPhysicalMaterial({ color: 0x1e1e23, metalness: 0.35, roughness: 0.42, clearcoat: 0.12, clearcoatRoughness: 0.5, envMapIntensity: 0.6 });
+  mats.alu_raw = new THREE.MeshStandardMaterial({ color: 0xa9adb3, metalness: 0.6, roughness: 0.38, envMapIntensity: 0.8 });
   mats.glass = new THREE.MeshPhysicalMaterial({ color: 0xeef7f5, metalness: 0, roughness: 0.3, transmission: 0.9, transparent: true, opacity: 1, emissive: 0x000000 });
   mats.screen = new THREE.MeshStandardMaterial({ color: 0x040404, metalness: 0.1, roughness: 0.12 });
   mats.pcb = new THREE.MeshStandardMaterial({ color: 0x15201a, roughness: 0.7 });
@@ -306,7 +308,7 @@ function init() {
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.outputEncoding = THREE.sRGBEncoding;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.0;
+  renderer.toneMappingExposure = 0.95;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   stage.prepend(renderer.domElement);
@@ -322,14 +324,14 @@ function init() {
   controls.maxPolarAngle = Math.PI * 0.62;
   controls.minDistance = 120; controls.maxDistance = 900;
 
-  const key = new THREE.DirectionalLight(0xffffff, 1.4);
+  const key = new THREE.DirectionalLight(0xffffff, 1.3);
   key.position.set(180, 320, 220);
   key.castShadow = true;
   key.shadow.mapSize.set(2048, 2048);
   Object.assign(key.shadow.camera, { left: -200, right: 200, top: 200, bottom: -200, near: 50, far: 900 });
   key.shadow.bias = -0.0005;
   scene.add(key);
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8580, 0.55));
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8580, 0.25));
   const rim = new THREE.DirectionalLight(0xffffff, 0.5);
   rim.position.set(-250, 150, -200);
   scene.add(rim);
@@ -415,7 +417,12 @@ function loadVariant(key) {
       o.material = mats[info.look].clone();
       o.castShadow = info.look !== "glass";
       o.receiveShadow = true;
-      o.userData = { name, info, base: o.position.clone(), baseMat: o.material };
+      o.userData = { name, info, base: o.position.clone(), baseMat: o.material,
+        diagMat: new THREE.MeshStandardMaterial({ color: new THREE.Color(PART_COLOUR[name] || "#999").convertSRGBToLinear(), roughness: 0.6, metalness: 0.05, envMapIntensity: 0.5, emissive: 0x000000 }) };
+      if (!o.geometry.attributes.normal) o.geometry.computeVertexNormals();
+      const edges = new THREE.LineSegments(new THREE.EdgesGeometry(o.geometry, 30), new THREE.LineBasicMaterial({ color: 0x151518, transparent: true, opacity: 0.55 }));
+      edges.visible = false; edges.raycast = () => {};
+      o.add(edges); o.userData.edges = edges;
       nodes[name] = o;
     });
     Object.values(nodes).forEach((o) => root.add(o));
@@ -454,7 +461,11 @@ function applyState() {
   const lamp = document.getElementById("lamp").checked;
   const cut = document.getElementById("cutaway").checked;
   const scr = document.getElementById("screen").checked;
+  const colour = document.getElementById("colour").checked;
   for (const [name, o] of Object.entries(nodes)) {
+    const want = colour && o.userData.info.look !== "glass" ? o.userData.diagMat : o.userData.baseMat;
+    if (o.material !== want) o.material = want;
+    o.userData.edges.visible = colour;
     const v = o.userData.info.explode;
     o.position.set(v[0] * ex, v[1] * ex, v[2] * ex);
     const see = cut && (name === "tube" || name === "cap_left" || name === "button");
@@ -661,7 +672,7 @@ function updateTotals() {
   const v = store.get(`in-${id}`, null); if (v != null) el.value = v;
   el.addEventListener("input", () => { store.set(`in-${id}`, el.value); updateTotals(); });
 });
-["explode", "lamp", "cutaway", "screen"].forEach((id) => document.getElementById(id).addEventListener("input", applyState));
+["explode", "lamp", "cutaway", "screen", "colour"].forEach((id) => document.getElementById(id).addEventListener("input", applyState));
 document.querySelectorAll("[data-view]").forEach((b) => b.addEventListener("click", () => setView(b.dataset.view)));
 function pickVariant(key) {
   document.getElementById("v-full").setAttribute("aria-pressed", key === "full");

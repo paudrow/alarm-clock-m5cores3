@@ -342,12 +342,15 @@ def main():
         asm.save(os.path.join(out, "assembly.step"))
 
         # One GLB for the web viewer; materials are assigned there by part name.
+        # Smooth-shade curved faces but keep sharp edges crisp (split at 30°),
+        # and include normals so the viewer can light the surfaces.
         scene = trimesh.Scene()
         for n in names:
             mesh = trimesh.load(os.path.join(out, f"{n}.stl"))
             mesh.merge_vertices()
+            mesh = trimesh.graph.smooth_shade(mesh, angle=math.radians(30))
             scene.add_geometry(mesh, node_name=n, geom_name=n)
-        scene.export(os.path.join(out, "clock.glb"))
+        scene.export(os.path.join(out, "clock.glb"), include_normals=True)
         with open(os.path.join(out, "report.json"), "w") as f:
             json.dump(report, f, indent=2)
         print(f"{v.key}: {geo['overall_w']:.1f} x {geo['overall_h']:.1f} x {geo['overall_d']:.1f} mm, "
