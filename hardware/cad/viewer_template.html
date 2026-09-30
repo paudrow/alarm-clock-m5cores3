@@ -66,6 +66,10 @@ h1 .dot { color: var(--accent); }
 .sim-set input { font: 13px var(--font-data); color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 3px; padding: 3px 4px; }
 .sim-set button, .link-btn { font: 600 13px var(--font-ui); color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 4px 10px; cursor: pointer; }
 .sim-error { color: var(--accent); font-size: 13px; margin: 8px 0 0; }
+.sim-reply { font: 12px var(--font-data); color: var(--muted); margin: 0; min-height: 1em; overflow-wrap: anywhere; }
+.mini-label { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.hud-right { display: flex; gap: 8px; }
+.stage.can-act canvas { cursor: pointer; }
 .labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
 .lbl { position: absolute; transform: translate(-50%, -100%); display: flex; flex-direction: column; align-items: center; gap: 3px; white-space: nowrap; }
 .lbl span { font: 500 11px var(--font-data); color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 3px; padding: 2px 6px; }
@@ -151,7 +155,7 @@ code { font-family: var(--font-data); font-size: 12px; }
       <div class="stage" id="stage">
         <div class="loading" id="loading">Loading model…</div>
         <div class="labels" id="labels" aria-hidden="true"></div>
-        <div class="hud"><span class="tag" id="hover" hidden></span><span class="tag" id="vlabel"></span></div>
+        <div class="hud"><span class="tag" id="hover" hidden></span><span class="hud-right"><span class="tag" id="sound-tag" hidden></span><span class="tag" id="vlabel"></span></span></div>
         <div class="bar">
           <div class="views" role="group" aria-label="Camera views">
             <button type="button" data-view="three">¾ view</button>
@@ -182,7 +186,7 @@ code { font-family: var(--font-data); font-size: 12px; }
           <input type="range" id="explode" min="0" max="100" value="0">
         </div>
         <div class="toggles">
-          <label class="toggle"><input type="checkbox" id="lamp" checked> Lamp on</label>
+          <label class="toggle"><input type="checkbox" id="lamp"> Lamp on</label>
           <label class="toggle"><input type="checkbox" id="cutaway"> See inside</label>
           <label class="toggle"><input type="checkbox" id="screen" checked> Screen on</label>
           <label class="toggle"><input type="checkbox" id="colour"> Colour parts</label>
@@ -190,31 +194,56 @@ code { font-family: var(--font-data); font-size: 12px; }
       </section>
 
       <section class="card" aria-labelledby="h-touch">
-        <h2 id="h-touch">Touchscreen</h2>
+        <h2 id="h-touch">The clock, running</h2>
         <div class="touch-wrap"><canvas id="sim-canvas" width="616" height="284" aria-label="The clock's touchscreen, running the firmware. Click to tap it."></canvas></div>
         <p class="sim-error" id="sim-error" hidden></p>
         <dl class="kv">
-          <dt>Clock time</dt><dd id="sim-time">–</dd>
-          <dt>Screen</dt><dd id="sim-res">–</dd>
-          <dt>Brightness</dt><dd id="sim-bright">–</dd>
+          <dt>Time</dt><dd id="sim-time">–</dd>
+          <dt>Screen</dt><dd id="sim-screen">–</dd>
+          <dt>Alarm</dt><dd id="sim-alarm">–</dd>
+          <dt>Lamp</dt><dd id="sim-lamp">–</dd>
+          <dt>Sleep sound</dt><dd id="sim-sound">–</dd>
+          <dt>Resolution</dt><dd id="sim-res">–</dd>
         </dl>
         <div class="sim-controls">
-          <div class="seg" role="group" aria-label="Clock speed">
-            <button type="button" data-speed="1" aria-pressed="true">Real time</button>
-            <button type="button" data-speed="60" aria-pressed="false">60×</button>
-            <button type="button" data-speed="600" aria-pressed="false">600×</button>
+          <div>
+            <div class="mini-label" id="go-label">Jump to</div>
+            <div class="seg" role="group" aria-labelledby="go-label">
+              <button type="button" data-go="day">Daytime</button>
+              <button type="button" data-go="night">Night</button>
+              <button type="button" data-go="sunrise">Sunrise</button>
+              <button type="button" data-go="alarm">Alarm</button>
+            </div>
+          </div>
+          <div>
+            <div class="mini-label" id="speed-label">Clock speed</div>
+            <div class="seg" role="group" aria-labelledby="speed-label">
+              <button type="button" data-speed="1" aria-pressed="true">Real time</button>
+              <button type="button" data-speed="60" aria-pressed="false">60×</button>
+              <button type="button" data-speed="600" aria-pressed="false">600×</button>
+            </div>
           </div>
           <div class="sim-set">
             <label for="sim-set">Set the clock to</label>
             <input type="time" id="sim-set" step="1" value="06:59:50">
             <button type="button" id="sim-set-btn">Set</button>
           </div>
+          <div class="sim-set">
+            <button type="button" id="sim-button">Press the button</button>
+            <button type="button" id="sim-noise">Sleep sound on/off</button>
+          </div>
+          <form class="sim-set" id="sim-console" autocomplete="off">
+            <label for="sim-cmd">Serial</label>
+            <input type="text" id="sim-cmd" placeholder="help" spellcheck="false" style="flex:1;min-width:0">
+            <button type="submit">Send</button>
+          </form>
+          <p class="sim-reply" id="sim-reply" aria-live="polite"></p>
           <div class="toggles" style="margin-top:0">
-            <label class="toggle"><input type="checkbox" id="sim-sound" checked> Sound</label>
+            <label class="toggle"><input type="checkbox" id="sim-audio" checked> Hear it</label>
             <button type="button" class="link-btn" id="sim-reset">Reset its settings</button>
           </div>
         </div>
-        <p class="note">This is the clock's real firmware, <code>src/main.cpp</code>, compiled to WebAssembly. It draws here and on the model's screen. Click here, or press Interact to use the screen on the model. Settings you change are kept in this browser, the way the clock keeps them through a power cut. To hear the alarm, turn it on, then set the clock to just before it.</p>
+        <p class="note">This is the clock's real firmware, <code>src/main.cpp</code>, compiled to WebAssembly. It draws here and on the model's screen, drives the lamp in the glass and plays the sleep sounds. On the model, click the screen to use it, the glass to switch the lamp, the speaker for sleep sounds and the top button to snooze. <b>Jump to</b> moves the clock's time: <b>Alarm</b> turns the alarm on and sets the clock 10 seconds before it. The Serial box takes the same commands as the real clock's USB console; so does <code>clock.command()</code> in the browser console. Settings are kept in this browser, the way the clock keeps them through a power cut.</p>
       </section>
 
       <section class="card" aria-labelledby="h-fit">
@@ -268,7 +297,7 @@ code { font-family: var(--font-data); font-size: 12px; }
   </div>
 
   <footer>
-    Generated from <code>hardware/cad/clock.py</code> (CadQuery). STEP and STL files for every part are in <code>hardware/cad/out/</code>, ready for the 3D printer or CAM. The 4.1″ screen module uses the outline measured from LilyGO's published T-Display-P4 model; the 2.41″ outline is an estimate until the Waveshare drawing is checked. The screen shows where the digits fall, not the real UI.
+    Generated from <code>hardware/cad/clock.py</code> (CadQuery). STEP and STL files for every part are in <code>hardware/cad/out/</code>, ready for the 3D printer or CAM. The 4.1″ screen module uses the outline measured from LilyGO's published T-Display-P4 model; the 2.41″ outline is an estimate until the Waveshare drawing is checked. The screen, lamp and speaker are driven by the clock's real firmware (<code>src/main.cpp</code>), running in the page.
   </footer>
 </div>
 
@@ -629,12 +658,19 @@ function init() {
   renderer.domElement.addEventListener("pointermove", onHover);
   renderer.domElement.addEventListener("pointerleave", () => { hover.hidden = true; });
   renderer.domElement.addEventListener("pointerdown", (e) => {
-    if (!interacting) return;
+    if (!interacting) { clickStart = [e.clientX, e.clientY]; return; }
     const pt = modelPoint(e);
     if (!pt) return;
     sim.ensureAudio(); modelDown = true; lastModelPt = pt;
     renderer.domElement.setPointerCapture(e.pointerId);
     sim.press(pt[0], pt[1], true); e.preventDefault();
+  });
+  // A click (not a drag to orbit) on a working part uses it.
+  renderer.domElement.addEventListener("pointerup", (e) => {
+    const start = clickStart; clickStart = null;
+    if (interacting || !start || Math.hypot(e.clientX - start[0], e.clientY - start[1]) > 5) return;
+    const part = partAt(e);
+    if (part && PART_ACTIONS[part]) { sim.ensureAudio(); PART_ACTIONS[part].run(part); showSimState(); }
   });
   const modelUp = () => { if (!modelDown) return; modelDown = false; sim.press(lastModelPt[0], lastModelPt[1], false); };
   renderer.domElement.addEventListener("pointerup", modelUp);
@@ -764,7 +800,7 @@ function screenImage(rep) {
 
 function applyState() {
   const ex = +document.getElementById("explode").value / 100;
-  const lamp = document.getElementById("lamp").checked;
+  const lampK = Math.sqrt(sim.lamp / 255); // the firmware drives the lamp; its duty is squared, so this is perceived level
   const cut = document.getElementById("cutaway").checked;
   const scr = document.getElementById("screen").checked;
   const colour = document.getElementById("colour").checked;
@@ -784,14 +820,15 @@ function applyState() {
   }
   const glassNode = nodes[g.glass_node], ledNode = nodes[g.led_node];
   if (glassNode) {
-    glassNode.material.emissive.setHex(lamp ? 0xb00018 : 0x000000);
-    glassNode.material.emissiveIntensity = lamp ? 1.0 : 0;
+    glassNode.material.emissive.setHex(lampK > 0 ? 0xb00018 : 0x000000);
+    glassNode.material.emissiveIntensity = lampK;
   }
-  if (ledNode && ledNode.material.emissive) { ledNode.material.emissive.setHex(0xff1030); ledNode.material.emissiveIntensity = lamp ? 1.4 : 0; }
+  if (ledNode && ledNode.material.emissive) { ledNode.material.emissive.setHex(0xff1030); ledNode.material.emissiveIntensity = 1.4 * lampK; }
   const gc = g.glass_center || [0, 0];
-  lampLight.intensity = lamp ? 1.6 : 0;
+  lampLight.intensity = 1.6 * lampK;
   lampLight.position.set(gc[0], 8 + (glassNode ? glassNode.position.z : 0), -gc[1]);
-  wash.visible = lamp && ex < 0.05;
+  wash.visible = lampK > 0 && ex < 0.05;
+  wash.material.opacity = 0.8 * lampK;
   if (screenPlane) screenPlane.visible = scr;
   if (!interacting) controls.target.set(baseTarget.x, baseTarget.y + (variant === "bench" ? 30 : 22) * ex, baseTarget.z);
   const btn = document.getElementById("explode-btn");
@@ -857,16 +894,20 @@ const mouse = new THREE.Vector2();
 
 // ---------- firmware simulator ----------
 // src/main.cpp compiled to WebAssembly (sim/build.py) against a stand-in for M5Unified
-// (sim/shim/). Its drawing, sound, clock and settings calls land in these functions.
+// (sim/shim/). Its drawing, sound, lamp, clock and settings calls land in these functions.
 const SIM_WASM = /*SIMWASM*/;
 const SIM_RES = { bench: [616, 284], full: [616, 284], lean: [600, 450] }; // each screen's aspect, at CoreS3-like pixel density
-const FONT_H = { 0: 8, 2: 16, 4: 26, 6: 48, 7: 48, 8: 75 };
+const LAMP_PIN = 9; // kLampPin in src/main.cpp
+const NOISE_CHANNEL = 1;
+// Line heights (px) of the firmware's fonts: TFT fonts 0-8, FreeSans 20-23, FreeSans Bold 30-33.
+const FONT_H = { 0: 8, 2: 16, 4: 26, 6: 48, 7: 48, 8: 75, 20: 22, 21: 29, 22: 42, 23: 56, 30: 22, 31: 29, 32: 42, 33: 56 };
 const SEG = { "0": "abcdef", "1": "bc", "2": "abged", "3": "abgcd", "4": "fgbc", "5": "afgcd", "6": "afgedc", "7": "abc", "8": "abcdefg", "9": "abcdfg", "-": "g", " ": "" };
 const rgb565 = (c) => `rgb(${((c >> 11) & 31) * 255 / 31 | 0},${((c >> 5) & 63) * 255 / 63 | 0},${(c & 31) * 255 / 31 | 0})`;
 function simFont(font, size) {
   const h = (FONT_H[font] || 8) * size;
   if (font === 8 || font === 6) return { css: `600 ${Math.round(h * 1.32)}px "Chivo Mono", ui-monospace, monospace`, px: h * 1.32 };
   if (font === 0) return { css: `${Math.round(h)}px ui-monospace, monospace`, px: h };
+  if (font >= 20) { const px = h * 0.74; return { css: `${font >= 30 ? 800 : 400} ${Math.round(px * 10) / 10}px "Chivo", Arial, sans-serif`, px }; }
   return { css: `600 ${Math.round(h)}px "Chivo", Arial, sans-serif`, px: h };
 }
 const sevenAdvance = (ch, s) => (ch === ":" || ch === ".") ? 12 * s : 32 * s;
@@ -885,28 +926,44 @@ function drawSeven(ctx, text, x, y, s) {
     cx += sevenAdvance(ch, s);
   }
 }
+function roundRectPath(ctx, x, y, w, h, r) {
+  r = Math.max(0, Math.min(r, w / 2, h / 2));
+  ctx.beginPath();
+  ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
 
 class ClockSim {
   constructor(canvas) {
     this.canvas = canvas; this.ctx = canvas.getContext("2d");
     this.module = null; this.inst = null; this.error = null;
     this.speed = 1; this.base = Date.now(); this.basePerf = performance.now(); this.offset = 0;
-    this.brightness = 255; this.dirty = true; this.queue = []; this.touch = { x: 0, y: 0, down: false };
-    this.sound = true; this.audio = null; this.voice = null; this.onBrightness = null;
+    this.brightness = 255; this.lamp = 0; this.dirty = true; this.queue = []; this.touch = { x: 0, y: 0, down: false };
+    this.sound = true; this.audio = null; this.voices = {}; this.streams = {};
+    this.onBrightness = null; this.onLamp = null; this.log = []; this.replies = [];
   }
   nowMs() { return this.base + (performance.now() - this.basePerf) * this.speed + this.offset; }
   setSpeed(s) { const now = this.nowMs(); this.speed = s; this.base = now; this.basePerf = performance.now(); this.offset = 0; }
   setClock(h, m, sec) { const d = new Date(this.nowMs()); d.setHours(h, m, sec || 0, 0); this.offset += d.getTime() - this.nowMs(); }
+  millis() { return performance.now() - this.bootPerf; }
   ensureAudio() {
     try {
       if (!this.audio) this.audio = new (window.AudioContext || window.webkitAudioContext)();
       if (this.audio.state === "suspended") this.audio.resume();
     } catch (e) { this.audio = null; }
   }
-  stopTone() { if (this.voice) { try { this.voice.osc.stop(); } catch (e) {} this.voice = null; } }
-  tone(freq, ms, vol) {
-    this.stopTone();
-    if (!this.sound || !this.audio || this.audio.state !== "running") return;
+  audible() { return this.sound && this.audio && this.audio.state === "running"; }
+  stopChannel(ch) {
+    for (const k of Object.keys(this.voices)) if (ch < 0 || +k === ch) { try { this.voices[k].stop(); } catch (e) {} delete this.voices[k]; }
+    for (const k of Object.keys(this.streams)) if (ch < 0 || +k === ch) {
+      for (const src of this.streams[k].sources) { try { src.stop(); } catch (e) {} }
+      delete this.streams[k];
+    }
+  }
+  stopTone() { this.stopChannel(-1); }
+  tone(freq, ms, vol, ch) {
+    if (this.voices[ch]) { try { this.voices[ch].stop(); } catch (e) {} delete this.voices[ch]; }
+    if (!this.audible()) return;
     const a = this.audio, t = a.currentTime;
     const osc = a.createOscillator(), gain = a.createGain();
     osc.type = "square"; osc.frequency.value = freq;
@@ -914,7 +971,32 @@ class ClockSim {
     gain.gain.setValueAtTime(0, t); gain.gain.linearRampToValueAtTime(level, t + 0.005);
     gain.gain.setValueAtTime(level, t + ms / 1000 - 0.01); gain.gain.linearRampToValueAtTime(0, t + ms / 1000);
     osc.connect(gain).connect(a.destination); osc.start(t); osc.stop(t + ms / 1000 + 0.02);
-    this.voice = { osc };
+    this.voices[ch] = osc;
+  }
+  // A buffer of 16-bit samples from the firmware (the sleep sounds). The firmware keeps two
+  // queued; `ends` tracks when each finishes on the firmware's clock, which is what it asks about.
+  playRaw(ch, samples, rate, vol) {
+    const s = this.streams[ch] || (this.streams[ch] = { ends: [], audioEnd: 0, sources: [] });
+    const now = this.millis();
+    s.ends = s.ends.filter((e) => e > now);
+    s.ends.push(Math.max(now, s.ends.length ? s.ends[s.ends.length - 1] : now) + 1000 * samples.length / rate);
+    if (!this.audible()) return;
+    const a = this.audio;
+    const buf = a.createBuffer(1, samples.length, rate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < samples.length; i++) data[i] = samples[i] / 32768;
+    const src = a.createBufferSource(), gain = a.createGain();
+    src.buffer = buf; gain.gain.value = Math.pow(vol / 255, 1.5) * 0.9;
+    src.connect(gain).connect(a.destination);
+    let at = Math.max(a.currentTime + 0.03, s.audioEnd);
+    if (at > a.currentTime + 1) at = a.currentTime + 0.03; // fell out of step: start over rather than lag
+    src.start(at); s.audioEnd = at + buf.duration;
+    s.sources.push(src); src.onended = () => { s.sources = s.sources.filter((x) => x !== src); };
+  }
+  channelBusy(ch) {
+    const s = this.streams[ch]; if (!s) return 0;
+    const now = this.millis(); s.ends = s.ends.filter((e) => e > now);
+    return Math.min(2, s.ends.length);
   }
   boot(w, h) {
     this.w = w; this.h = h; this.error = null;
@@ -937,9 +1019,12 @@ class ClockSim {
     const env = {
       js_fill_rect(x, y, w2, h2, c) { ctx.fillStyle = rgb565(c); ctx.fillRect(x, y, w2, h2); self.dirty = true; },
       js_draw_rect(x, y, w2, h2, c) { ctx.strokeStyle = rgb565(c); ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, y + 0.5, w2 - 1, h2 - 1); self.dirty = true; },
+      js_fill_round_rect(x, y, w2, h2, r, c) { ctx.fillStyle = rgb565(c); roundRectPath(ctx, x, y, w2, h2, r); ctx.fill(); self.dirty = true; },
+      js_draw_round_rect(x, y, w2, h2, r, c) { ctx.strokeStyle = rgb565(c); ctx.lineWidth = 1; roundRectPath(ctx, x + 0.5, y + 0.5, w2 - 1, h2 - 1, r); ctx.stroke(); self.dirty = true; },
       js_draw_line(x0, y0, x1, y1, c) { ctx.strokeStyle = rgb565(c); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x0 + 0.5, y0 + 0.5); ctx.lineTo(x1 + 0.5, y1 + 0.5); ctx.stroke(); self.dirty = true; },
       js_draw_circle(x, y, r, c) { ctx.strokeStyle = rgb565(c); ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x + 0.5, y + 0.5, r, 0, Math.PI * 2); ctx.stroke(); self.dirty = true; },
       js_fill_circle(x, y, r, c) { ctx.fillStyle = rgb565(c); ctx.beginPath(); ctx.arc(x + 0.5, y + 0.5, r + 0.5, 0, Math.PI * 2); ctx.fill(); self.dirty = true; },
+      js_fill_triangle(x0, y0, x1, y1, x2, y2, c) { ctx.fillStyle = rgb565(c); ctx.beginPath(); ctx.moveTo(x0 + 0.5, y0 + 0.5); ctx.lineTo(x1 + 0.5, y1 + 0.5); ctx.lineTo(x2 + 0.5, y2 + 0.5); ctx.closePath(); ctx.fill(); self.dirty = true; },
       js_draw_string(p, n, x, y, datum, fg, bg, font, size) {
         const text = str(p, n), tw = measure(text, font, size), fh = Math.round((FONT_H[font] || 8) * size);
         const xa = datum & 3, ya = (datum >> 2) & 3;
@@ -958,15 +1043,20 @@ class ClockSim {
       js_text_width(p, n, font, size) { return measure(str(p, n), font, size); },
       js_font_height(font, size) { return Math.round((FONT_H[font] || 8) * size); },
       js_set_brightness(v) { if (v !== self.brightness) { self.brightness = v; if (self.onBrightness) self.onBrightness(v); } },
-      js_tone(freq, ms, vol) { self.tone(freq, ms, vol); },
-      js_stop_tone() { self.stopTone(); },
-      js_millis() { return performance.now() - self.bootPerf; },
+      js_tone(freq, ms, vol, ch) { self.tone(freq, ms, vol, ch); },
+      js_stop_tone(ch) { self.stopChannel(ch); },
+      js_play_raw(ch, p, n, rate, vol) { self.playRaw(ch, new Int16Array(mem.buffer, p, n), rate, vol); },
+      js_channel_busy(ch) { return self.channelBusy(ch); },
+      js_millis() { return self.millis(); },
       js_get_time(p) {
         const d = new Date(self.nowMs());
         new Int32Array(mem.buffer, p, 6).set([d.getFullYear(), d.getMonth() + 1, d.getDate(), d.getHours(), d.getMinutes(), d.getSeconds()]);
       },
       js_set_time(y, mo, d, h, mi, sec) { self.offset += new Date(y, mo - 1, d, h, mi, sec).getTime() - self.nowMs(); },
-      js_log(p, n) { console.debug("[clock]", str(p, n)); },
+      js_log(p, n) {
+        const line = str(p, n); console.debug("[clock]", line);
+        self.log.push(line); if (self.log.length > 200) self.log.shift();
+      },
       js_pref_get(k, kl, buf, cap) {
         let v = null; try { v = localStorage.getItem(prefKey(k, kl)); } catch (e) {}
         if (!v) return 0;
@@ -978,11 +1068,13 @@ class ClockSim {
         const b = new Uint8Array(mem.buffer, buf, n); let raw = "";
         for (let i = 0; i < n; i++) raw += String.fromCharCode(b[i]);
         try { localStorage.setItem(prefKey(k, kl), btoa(raw)); } catch (e) {}
-      }
+      },
+      js_analog_write(pin, v) { if (pin === LAMP_PIN && v !== self.lamp) { self.lamp = v; if (self.onLamp) self.onLamp(v); } }
     };
     this.bootPerf = performance.now();
     this.inst = new WebAssembly.Instance(this.module, { env });
     mem = this.inst.exports.memory;
+    this.mem = () => mem;
     this.inst.exports._initialize();
     this.inst.exports.sim_init(w, h);
     this.dirty = true;
@@ -996,15 +1088,39 @@ class ClockSim {
       while (this.queue.length && this.queue[0].down === ev.down) Object.assign(ev, this.queue.shift());
       this.touch = ev;
     }
-    try {
+    this.run(() => {
       this.inst.exports.sim_touch(this.touch.x | 0, this.touch.y | 0, this.touch.down ? 1 : 0);
       this.inst.exports.sim_loop();
-    } catch (err) {
+    });
+  }
+  run(fn) {
+    if (!this.inst || this.error) return undefined;
+    try { return fn(); } catch (err) {
       this.error = err; this.stopTone();
       const el = document.getElementById("sim-error");
       el.textContent = `The firmware stopped: ${err.message}. Reload the page to restart it.`; el.hidden = false;
+      return undefined;
     }
   }
+  // Types a line on the clock's serial console (the same commands work over USB on the
+  // real clock; "help" lists them) and runs one loop so it takes effect. Returns the reply.
+  command(line) {
+    return this.run(() => {
+      const bytes = new TextEncoder().encode(String(line).slice(0, 1000));
+      new Uint8Array(this.mem().buffer, this.inst.exports.sim_io(), bytes.length).set(bytes);
+      this.inst.exports.sim_input(bytes.length);
+      const before = this.log.length;
+      this.inst.exports.sim_loop();
+      return this.log.slice(before).filter((l) => !/^\d\d:\d\d:\d\d /.test(l)).join("").trim();
+    }) || "";
+  }
+  state() {
+    return this.run(() => {
+      const n = this.inst.exports.sim_state();
+      return JSON.parse(new TextDecoder().decode(new Uint8Array(this.mem().buffer, this.inst.exports.sim_io(), n)));
+    }) || null;
+  }
+  button() { this.run(() => this.inst.exports.sim_button()); }
   resetSettings() {
     try { Object.keys(localStorage).filter((k) => k.startsWith("clocksim:")).forEach((k) => localStorage.removeItem(k)); } catch (e) {}
     this.boot(this.w, this.h);
@@ -1013,12 +1129,13 @@ class ClockSim {
 
 const simCanvas = document.getElementById("sim-canvas");
 const sim = new ClockSim(simCanvas);
-let simTexture = null, simKey = null;
+let simTexture = null, simKey = null, simState = null;
 function simBrightnessScale() { return 0.12 + 0.88 * sim.brightness / 255; }
 sim.onBrightness = () => {
   if (screenPlane && screenPlane.material.map === simTexture) screenPlane.material.color.setScalar(simBrightnessScale());
   simCanvas.style.filter = `brightness(${simBrightnessScale().toFixed(2)})`;
 };
+sim.onLamp = () => { applyState(); };
 function startSimFor(key) {
   const [w, h] = SIM_RES[key];
   if (!simTexture || sim.w !== w || sim.h !== h) {
@@ -1041,12 +1158,32 @@ function simTick() {
   sim.frame();
   if (sim.dirty && simTexture) { simTexture.needsUpdate = true; sim.dirty = false; }
 }
-setInterval(() => {
+const SCREEN_NAMES = { clock: "Clock", settings: "Settings", alarm: "Alarm", alarm_sound: "Alarm sound", sleep_sounds: "Sleep sounds",
+  lamp: "Lamp", day_screen: "Day screen", night_screen: "Night screen", night_hours: "Night hours" };
+const ALARM_STATES = { armed: "set", ringing: "ringing", silenced: "stopped", skipped: "skipped this time" };
+function showSimState() {
   if (!sim.inst) return;
   const d = new Date(sim.nowMs());
+  const s = simState = sim.state();
   document.getElementById("sim-time").textContent = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) + (sim.speed > 1 ? ` (${sim.speed}×)` : "");
-  document.getElementById("sim-bright").textContent = `${Math.round(sim.brightness / 2.55)}%`;
-}, 250);
+  if (!s) return;
+  document.getElementById("sim-screen").textContent = `${SCREEN_NAMES[s.screen] || s.screen}, ${s.night ? "night" : "day"} look, ${s.brightness}%`;
+  document.getElementById("sim-alarm").textContent = s.alarm.enabled
+    ? `${s.alarm.at}, ${s.alarm.snooze ? `snoozed to ${s.alarm.snooze}` : ALARM_STATES[s.alarm.state] || s.alarm.state}${s.alarm.skip_next ? ", skipping next" : ""}`
+    : `${s.alarm.at}, off`;
+  const lampPct = Math.round(s.lamp.level / 10);
+  document.getElementById("sim-lamp").textContent = s.lamp.level > 0
+    ? `On, ${lampPct}%${s.lamp.wake ? " (wake light)" : s.lamp.level > (s.lamp.on ? s.lamp.brightness * 10 : 0) ? " (sunrise)" : ""}`
+    : s.lamp.sunrise ? `Off, sunrise ${s.lamp.sunrise} min before the alarm` : "Off";
+  document.getElementById("sim-sound").textContent = s.sound.playing
+    ? `${s.sound.kind[0].toUpperCase() + s.sound.kind.slice(1)} noise, ${s.sound.volume}%${s.sound.minutes_left ? `, ${s.sound.minutes_left} min left` : ""}`
+    : "Off";
+  const lampBox = document.getElementById("lamp");
+  if (lampBox.checked !== s.lamp.level > 0) lampBox.checked = s.lamp.level > 0;
+  const tag = document.getElementById("sound-tag");
+  tag.hidden = !s.sound.playing; if (s.sound.playing) tag.textContent = `♪ ${s.sound.kind} noise`;
+}
+setInterval(showSimState, 250);
 
 // Touch on the 2D panel
 let panelDown = false;
@@ -1067,8 +1204,49 @@ document.getElementById("sim-set-btn").addEventListener("click", () => {
   const [h, m, sec] = v.split(":").map(Number);
   sim.setClock(h, m, sec || 0);
 });
-document.getElementById("sim-sound").addEventListener("change", (e) => { sim.sound = e.target.checked; if (sim.sound) sim.ensureAudio(); else sim.stopTone(); });
+document.querySelectorAll("[data-go]").forEach((b) => b.addEventListener("click", () => {
+  sim.ensureAudio(); sim.command(`go ${b.dataset.go}`); showSimState();
+}));
+document.getElementById("sim-button").addEventListener("click", () => { sim.ensureAudio(); pressButton(); });
+document.getElementById("sim-noise").addEventListener("click", () => { sim.ensureAudio(); sim.command("sound toggle"); showSimState(); });
+document.getElementById("sim-audio").addEventListener("change", (e) => { sim.sound = e.target.checked; if (sim.sound) sim.ensureAudio(); else sim.stopTone(); });
 document.getElementById("sim-reset").addEventListener("click", () => sim.resetSettings());
+document.getElementById("lamp").addEventListener("change", (e) => { sim.command(e.target.checked ? "lamp on" : "lamp off"); showSimState(); });
+const consoleForm = document.getElementById("sim-console");
+consoleForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const input = document.getElementById("sim-cmd");
+  if (!input.value.trim()) return;
+  sim.ensureAudio();
+  document.getElementById("sim-reply").textContent = sim.command(input.value) || "(no reply)";
+  input.select(); showSimState();
+});
+
+// The physical button: presses on the model, the page and the API all come here.
+function pressButton() {
+  sim.button();
+  const b = nodes.button;
+  if (b && !reduceMotion) {
+    const z = b.position.z; b.position.z = z - 1.2;
+    setTimeout(() => { b.position.z = z; }, 140);
+  }
+}
+
+// For scripts and the console: drive the firmware without the mouse.
+//   clock.command("lamp 40")      clock.state()       clock.goTo("night")
+//   clock.tap(x, y)               clock.button()      clock.setSpeed(60)
+window.clock = {
+  command: (line) => sim.command(line),
+  state: () => sim.state(),
+  goTo: (where) => sim.command(`go ${where}`),
+  setTime: (h, m, s = 0) => sim.command(`time ${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`),
+  setSpeed: (n) => sim.setSpeed(n),
+  button: () => pressButton(),
+  tap: (x, y) => { sim.press(x, y, true); sim.press(x, y, false); },
+  press: (x, y, down) => sim.press(x, y, down),
+  screenSize: () => [sim.w, sim.h],
+  log: () => sim.log.slice()
+};
 
 // ---------- Interact: fly to the model's screen and touch it ----------
 let interacting = false, savedCam = null, modelDown = false, lastModelPt = [0, 0];
@@ -1123,6 +1301,34 @@ function modelPoint(e) {
   return hit && hit.uv ? [hit.uv.x * sim.w, (1 - hit.uv.y) * sim.h] : null;
 }
 
+// What each working part does when clicked. The lamp, speaker and button go
+// through the firmware, just as the real ones will.
+const lampAction = { hint: "click to switch the lamp", run: () => sim.command("lamp toggle") };
+const soundAction = { hint: "click for sleep sounds", run: () => sim.command("sound toggle") };
+const screenAction = { hint: "click to use the screen", run: () => enterInteract() };
+const GO_CYCLE = ["day", "night", "sunrise", "alarm"];
+let goNext = 0;
+const PART_ACTIONS = {
+  glass_base: lampAction, leds: lampAction, glass_sample: lampAction, led_stars: lampAction, lamp_cradle: lampAction,
+  opamp: lampAction, mosfet: lampAction, mosfet_small: lampAction,
+  speaker: soundAction, chamber: soundAction, spk_box: soundAction, spk_lid: soundAction, spk_ring: soundAction, spk_filler: soundAction, amp: soundAction,
+  screen: screenAction, screen_frame: screenAction, tdisplay: screenAction, display_stand: screenAction,
+  button: { hint: "click to press: snooze, or the lamp", run: () => pressButton() },
+  rtc: { hint: "click to jump the time: day, night, sunrise, alarm", run: () => { sim.command(`go ${GO_CYCLE[goNext]}`); goNext = (goNext + 1) % GO_CYCLE.length; } }
+};
+let clickStart = null;
+
+function partAt(e) {
+  const r = renderer.domElement.getBoundingClientRect();
+  mouse.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(mouse, camera);
+  const cut = document.getElementById("cutaway").checked;
+  const hits = ray.intersectObjects(Object.values(nodes), false).filter((h) => !(cut && h.object.material.opacity < 0.5));
+  if (!hits.length) return null;
+  const o = hits[0].object.userData.name ? hits[0].object : hits[0].object.parent;
+  return o.userData.name || null;
+}
+
 function onHover(e) {
   if (interacting) {
     const pt = modelPoint(e);
@@ -1130,15 +1336,12 @@ function onHover(e) {
     if (modelDown && pt) { lastModelPt = pt; sim.press(pt[0], pt[1], true); }
     return;
   }
-  const r = renderer.domElement.getBoundingClientRect();
-  mouse.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
-  ray.setFromCamera(mouse, camera);
-  const cut = document.getElementById("cutaway").checked;
-  const hits = ray.intersectObjects(Object.values(nodes), false).filter((h) => !(cut && h.object.material.opacity < 0.5));
-  if (!hits.length) { hover.hidden = true; return; }
-  const o = hits[0].object.userData.name ? hits[0].object : hits[0].object.parent;
-  const info = o.userData.info;
-  hover.textContent = info.material ? `${info.label} · ${info.material}` : info.label;
+  const name = partAt(e);
+  stage.classList.toggle("can-act", !!(name && PART_ACTIONS[name]));
+  if (!name) { hover.hidden = true; return; }
+  const info = nodes[name].userData.info;
+  const action = PART_ACTIONS[name];
+  hover.textContent = (info.material ? `${info.label} · ${info.material}` : info.label) + (action ? ` · ${action.hint}` : "");
   hover.hidden = false;
 }
 
@@ -1153,6 +1356,13 @@ function flash(name) {
 function animate() {
   requestAnimationFrame(animate);
   simTick();
+  // The speaker glows while the firmware is streaming sleep sounds (see it with See inside or Explode).
+  const spk = nodes.speaker;
+  if (spk && spk.material.emissive && spk.material === spk.userData.baseMat) {
+    const on = !!(simState && simState.sound.playing);
+    spk.material.emissive.setHex(on ? 0x2a48ff : 0x000000);
+    spk.material.emissiveIntensity = on && !reduceMotion ? 0.3 + 0.2 * Math.sin(performance.now() / 160) : on ? 0.3 : 0;
+  }
   controls.update();
   renderer.render(scene, camera);
   placeLabels();
@@ -1324,7 +1534,7 @@ function updateTotals() {
   const v = store.get(`in-${id}`, null); if (v != null) el.value = v;
   el.addEventListener("input", () => { store.set(`in-${id}`, el.value); updateTotals(); });
 });
-["explode", "lamp", "cutaway", "screen", "colour"].forEach((id) => document.getElementById(id).addEventListener("input", applyState));
+["explode", "cutaway", "screen", "colour"].forEach((id) => document.getElementById(id).addEventListener("input", applyState));
 document.querySelectorAll("[data-view]").forEach((b) => b.addEventListener("click", () => setView(b.dataset.view)));
 const variantButtons = [...document.querySelectorAll("[data-variant]")];
 function markVariant(key) { variantButtons.forEach((b) => b.setAttribute("aria-pressed", b.dataset.variant === key)); }

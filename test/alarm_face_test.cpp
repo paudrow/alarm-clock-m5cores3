@@ -1,7 +1,9 @@
 #include "alarm_face.hpp"
 
+#include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <string>
 
 namespace {
 
@@ -13,6 +15,8 @@ void check(bool ok, const char* name) {
     failures = 1;
   }
 }
+
+void check(bool ok, const std::string& name) { check(ok, name.c_str()); }
 
 bool step_is(Step a, Occurrence occurrence, Intensity intensity, bool skip_next) {
   return a.occurrence == occurrence && a.intensity == intensity &&
@@ -26,6 +30,137 @@ Inputs in_at(int hour, int minute, int second, bool touched, int gentle) {
 bool alarm_eq(Alarm a, Alarm b) {
   return a.at.hour == b.at.hour && a.at.minute == b.at.minute &&
          a.enabled == b.enabled && a.skip_next == b.skip_next;
+}
+
+bool contains(Box outer, Box inner) {
+  return inner.x >= outer.x && inner.y >= outer.y &&
+         inner.x + inner.w <= outer.x + outer.w &&
+         inner.y + inner.h <= outer.y + outer.h;
+}
+
+std::string size_name(int w, int h) {
+  return std::to_string(w) + "x" + std::to_string(h);
+}
+
+// The layout rules every screen size must keep.
+void check_layout(int w, int h) {
+  const Ui ui = ui_for(w, h);
+  const Box screen = {0, 0, w, h};
+  const std::string at = size_name(w, h) + ": ";
+  const bool big = w >= 320 && h >= 240;
+  const int min_touch = big ? 40 : 20;
+
+  // Clock face: icons in a row at the top, the digits under them, the ring
+  // buttons and status line at the bottom, nothing overlapping.
+  const ClockHit icons[] = {ClockHit::Gear, ClockHit::Bell, ClockHit::Skip,
+                            ClockHit::Lamp, ClockHit::Sound};
+  for (int i = 0; i < 5; ++i) {
+    const Box a = clock_icon_box(ui, icons[i]);
+    check(contains(screen, a), at + "clock icon on screen");
+    check(a.w >= min_touch - 16 && a.h >= min_touch - 16, at + "clock icon big enough");
+    check(clock_hit(ui, a.x + a.w / 2, a.y + a.h / 2) == icons[i], at + "clock icon hit");
+    for (int j = i + 1; j < 5; ++j) {
+      check(!boxes_overlap(a, clock_icon_box(ui, icons[j])), at + "clock icons apart");
+    }
+    check(!boxes_overlap(a, clock_digits_box(ui, false)), at + "icons above the digits");
+    check(!boxes_overlap(a, clock_digits_box(ui, true)), at + "icons above the digits, ringing");
+  }
+  check(clock_hit(ui, w / 2, h / 2) == ClockHit::Face, at + "middle is the face");
+  const Box snooze = ring_box(ui, false);
+  const Box stop = ring_box(ui, true);
+  check(contains(screen, snooze) && contains(screen, stop), at + "ring buttons on screen");
+  check(!boxes_overlap(snooze, stop), at + "ring buttons apart");
+  check(snooze.h >= min_touch - 16 && snooze.w >= w / 3, at + "ring buttons big");
+  check(ring_hit(ui, snooze.x + 2, snooze.y + 2) == RingHit::Snooze, at + "snooze hit");
+  check(ring_hit(ui, stop.x + stop.w - 3, stop.y + stop.h - 3) == RingHit::Stop, at + "stop hit");
+  check(ring_hit(ui, w / 2, snooze.y + snooze.h / 2) == RingHit::None, at + "gap between ring buttons");
+  check(ring_hit(ui, -1, -1) == RingHit::None && ring_hit(ui, w, h) == RingHit::None,
+        at + "ring_hit off screen");
+  const Box digits = clock_digits_box(ui, true);
+  check(digits.h > 0 && !boxes_overlap(digits, snooze), at + "digits clear of ring buttons");
+  const Box quiet = clock_digits_box(ui, false);
+  check(quiet.h >= digits.h && !boxes_overlap(quiet, clock_status_box(ui)),
+        at + "digits clear of status line");
+  check(contains(screen, clock_status_box(ui)), at + "status line on screen");
+
+  // Settings menu tiles
+  for (int i = 0; i < kMenuItems; ++i) {
+    const Box t = tile_box(ui, i, kMenuItems);
+    check(contains(screen, t), at + "tile on screen");
+    check(t.y >= ui.header, at + "tile under the header");
+    check(t.h >= min_touch && t.w >= min_touch, at + "tile big enough");
+    check(tile_hit(ui, kMenuItems, t.x + t.w / 2, t.y + t.h / 2) == i, at + "tile hit");
+    check(!boxes_overlap(t, header_back_box(ui)), at + "tile clear of Back");
+    for (int j = i + 1; j < kMenuItems; ++j) {
+      check(!boxes_overlap(t, tile_box(ui, j, kMenuItems)), at + "tiles apart");
+    }
+  }
+  check(tile_hit(ui, kMenuItems, 0, 0) == -1, at + "corner is no tile");
+
+  // Settings pages
+  const Box back = header_back_box(ui);
+  check(contains(screen, back) && back.h >= min_touch - 16, at + "Back on screen and big");
+  check(header_title_box(ui).w > w / 3, at + "room for a title");
+  const Screen pages[] = {Screen::Alarm,     Screen::AlarmSound,  Screen::SleepSounds,
+                          Screen::Lamp,      Screen::DayScreen,   Screen::NightScreen,
+                          Screen::NightHours};
+  for (Screen s : pages) {
+    RowKind kinds[kMaxRows];
+    const int n = page_rows(s, kinds);
+    check(n >= 1 && n <= kMaxRows, at + "page has rows");
+    for (int r = 0; r < n; ++r) {
+      const Box row = row_box(ui, r, n);
+      const std::string where = at + screen_key(s) + " row " + std::to_string(r) + ": ";
+      check(contains(screen, row), where + "on screen");
+      check(!boxes_overlap(row, back) && row.y >= ui.header, where + "under the header");
+      check(row.h >= min_touch - (big ? 0 : 0), where + "tall enough to touch");
+      if (r + 1 < n) {
+        check(!boxes_overlap(row, row_box(ui, r + 1, n)), where + "apart from the next");
+      }
+      const Box label = row_label_box(ui, row, kinds[r]);
+      check(label.w > 0 && contains(row, label), where + "label has room");
+      if (kinds[r] == RowKind::Stepper) {
+        const Box minus = row_part_box(ui, row, Part::Minus);
+        const Box plus = row_part_box(ui, row, Part::Plus);
+        const Box value = stepper_value_box(ui, row);
+        check(contains(row, minus) && contains(row, plus) && contains(row, value),
+              where + "stepper parts in the row");
+        check(!boxes_overlap(minus, plus) && !boxes_overlap(minus, value) &&
+                  !boxes_overlap(value, plus) && !boxes_overlap(label, minus),
+              where + "stepper parts apart");
+        check(minus.w >= min_touch - 8, where + "- and + big enough");
+        const Hit hm = page_hit(ui, kinds, n, minus.x + minus.w / 2, minus.y + minus.h / 2);
+        const Hit hp = page_hit(ui, kinds, n, plus.x + plus.w / 2, plus.y + plus.h / 2);
+        check(hm.part == Part::Minus && hm.row == r, where + "- hit");
+        check(hp.part == Part::Plus && hp.row == r, where + "+ hit");
+        const Hit hv = page_hit(ui, kinds, n, value.x + value.w / 2, value.y + value.h / 2);
+        check(hv.part == Part::None, where + "value isn't a button");
+      } else if (kinds[r] == RowKind::Pair) {
+        const Box l = row_part_box(ui, row, Part::Left);
+        const Box rr = row_part_box(ui, row, Part::Right);
+        check(!boxes_overlap(l, rr) && contains(row, l) && contains(row, rr), where + "pair apart");
+        check(page_hit(ui, kinds, n, l.x + 1, l.y + 1).part == Part::Left, where + "left hit");
+        check(page_hit(ui, kinds, n, rr.x + rr.w - 2, rr.y + 1).part == Part::Right, where + "right hit");
+      } else {
+        const Hit hw = page_hit(ui, kinds, n, row.x + 1, row.y + row.h - 2);
+        check(hw.part == Part::Whole && hw.row == r, where + "whole row hit");
+      }
+    }
+    check(page_hit(ui, kinds, n, back.x + 1, back.y + 1).part == Part::Back, at + "Back hit");
+    check(page_hit(ui, kinds, n, -5, 10).part == Part::None, at + "off screen is nothing");
+    // Every point: whatever it hits, it is inside that thing.
+    for (int y = 0; y < h; y += 3) {
+      for (int x = 0; x < w; x += 3) {
+        const Hit hit = page_hit(ui, kinds, n, x, y);
+        if (hit.part == Part::Back) {
+          check(in_box(back, x, y), at + "Back hit outside Back");
+        } else if (hit.part != Part::None) {
+          const Box row = row_box(ui, hit.row, n);
+          check(in_box(row_part_box(ui, row, hit.part), x, y), at + "hit outside its part");
+        }
+      }
+    }
+  }
 }
 
 bool stamp_eq(YmdHms a, YmdHms b) {
@@ -264,149 +399,10 @@ int main() {
     check(!preview_playing(2000), "preview_playing(2000) false");
   }
   {
-    check(clock_hit(290, 20, 320, 240) == ClockHit::Gear,
-          "clock_hit(290, 20, 320, 240) Gear");
-    check(clock_hit(250, 20, 320, 240) == ClockHit::Bell,
-          "clock_hit(250, 20, 320, 240) Bell");
-    check(clock_hit(200, 20, 320, 240) == ClockHit::Skip,
-          "clock_hit(200, 20, 320, 240) Skip");
-    check(clock_hit(160, 20, 320, 240) == ClockHit::Face,
-          "clock_hit(160, 20, 320, 240) Face");
-    check(clock_hit(290, 60, 320, 240) == ClockHit::Face,
-          "clock_hit(290, 60, 320, 240) Face");
-  }
-  {
-    const int w = 320;
-    const int h = 240;
-    check(menu_hit(20, 30, w, h) == MenuHit::Back, "menu_hit (20, 30) Back");
-    check(menu_hit(200, 30, w, h) == MenuHit::None, "menu_hit (200, 30) None");
-    check(menu_hit(30, 52, w, h) == MenuHit::None, "menu_hit (30, 52) None");
-    check(menu_hit(160, 72, w, h) == MenuHit::Alarm, "menu_hit (160, 72) Alarm");
-    check(menu_hit(160, 90, w, h) == MenuHit::None, "menu_hit (160, 90) None");
-    check(menu_hit(20, 90, w, h) == MenuHit::None, "menu_hit (20, 90) None");
-    check(menu_hit(160, 120, w, h) == MenuHit::Sound,
-          "menu_hit (160, 120) Sound");
-    check(menu_hit(160, 168, w, h) == MenuHit::Day, "menu_hit (160, 168) Day");
-    check(menu_hit(160, 216, w, h) == MenuHit::Night,
-          "menu_hit (160, 216) Night");
-  }
-  {
-    const int w = 320;
-    const int h = 240;
-    check(alarm_page_hit(20, 40, w, h) == AlarmPageHit::Back,
-          "alarm_page_hit (20, 40) Back");
-    check(alarm_page_hit(160, 80, w, h) == AlarmPageHit::None,
-          "alarm_page_hit (160, 80) None");
-    check(alarm_page_hit(160, 120, w, h) == AlarmPageHit::Toggle,
-          "alarm_page_hit (160, 120) Toggle");
-    check(alarm_page_hit(20, 200, w, h) == AlarmPageHit::HourDown,
-          "alarm_page_hit (20, 200) HourDown");
-    check(alarm_page_hit(78, 200, w, h) == AlarmPageHit::None,
-          "alarm_page_hit (78, 200) None");
-    check(alarm_page_hit(300, 200, w, h) == AlarmPageHit::MinuteUp,
-          "alarm_page_hit (300, 200) MinuteUp");
-  }
-  {
-    const int w = 320;
-    const int h = 240;
-    check(sound_page_hit(20, 24, w, h) == SoundPageHit::Back,
-          "sound_page_hit (20, 24) Back");
-    check(sound_page_hit(20, 45, w, h) == SoundPageHit::None,
-          "sound_page_hit (20, 45) None");
-    check(sound_page_hit(20, 72, w, h) == SoundPageHit::VolumeDown,
-          "sound_page_hit (20, 72) VolumeDown");
-    check(sound_page_hit(160, 72, w, h) == SoundPageHit::None,
-          "sound_page_hit (160, 72) None");
-    check(sound_page_hit(300, 72, w, h) == SoundPageHit::VolumeUp,
-          "sound_page_hit (300, 72) VolumeUp");
-    check(sound_page_hit(20, 120, w, h) == SoundPageHit::SoftDown,
-          "sound_page_hit (20, 120) SoftDown");
-    check(sound_page_hit(300, 120, w, h) == SoundPageHit::SoftUp,
-          "sound_page_hit (300, 120) SoftUp");
-    check(sound_page_hit(20, 168, w, h) == SoundPageHit::GentleDown,
-          "sound_page_hit (20, 168) GentleDown");
-    check(sound_page_hit(300, 168, w, h) == SoundPageHit::GentleUp,
-          "sound_page_hit (300, 168) GentleUp");
-    check(sound_page_hit(40, 216, w, h) == SoundPageHit::PreviewSoft,
-          "sound_page_hit (40, 216) PreviewSoft");
-    check(sound_page_hit(160, 216, w, h) == SoundPageHit::None,
-          "sound_page_hit (160, 216) None");
-    check(sound_page_hit(200, 216, w, h) == SoundPageHit::PreviewLoud,
-          "sound_page_hit (200, 216) PreviewLoud");
-  }
-  {
-    const int w = 320;
-    const int h = 240;
-    check(day_page_hit(20, 40, w, h) == DayPageHit::Back,
-          "day_page_hit (20, 40) Back");
-    check(day_page_hit(160, 40, w, h) == DayPageHit::None,
-          "day_page_hit (160, 40) None");
-    check(day_page_hit(20, 60, w, h) == DayPageHit::None,
-          "day_page_hit (20, 60) None");
-    check(day_page_hit(20, 90, w, h) == DayPageHit::BrightDown,
-          "day_page_hit (20, 90) BrightDown");
-    check(day_page_hit(160, 90, w, h) == DayPageHit::None,
-          "day_page_hit (160, 90) None");
-    check(day_page_hit(300, 90, w, h) == DayPageHit::BrightUp,
-          "day_page_hit (300, 90) BrightUp");
-    check(day_page_hit(160, 150, w, h) == DayPageHit::Face,
-          "day_page_hit (160, 150) Face");
-    check(day_page_hit(160, 210, w, h) == DayPageHit::Hour,
-          "day_page_hit (160, 210) Hour");
-  }
-  {
-    const int w = 320;
-    const int h = 240;
-    check(night_page_hit(20, 24, w, h) == NightPageHit::Back,
-          "night_page_hit (20, 24) Back");
-    check(night_page_hit(20, 72, w, h) == NightPageHit::BrightDown,
-          "night_page_hit (20, 72) BrightDown");
-    check(night_page_hit(160, 72, w, h) == NightPageHit::None,
-          "night_page_hit (160, 72) None");
-    check(night_page_hit(300, 72, w, h) == NightPageHit::BrightUp,
-          "night_page_hit (300, 72) BrightUp");
-    check(night_page_hit(160, 120, w, h) == NightPageHit::Face,
-          "night_page_hit (160, 120) Face");
-    check(night_page_hit(160, 168, w, h) == NightPageHit::Hour,
-          "night_page_hit (160, 168) Hour");
-    check(night_page_hit(160, 216, w, h) == NightPageHit::When,
-          "night_page_hit (160, 216) When");
-    check(night_page_hit(20, 50, w, h) == NightPageHit::None,
-          "night_page_hit (20, 50) None");
-  }
-  {
-    const int w = 320;
-    const int h = 240;
-    check(when_page_hit(20, 30, w, h) == WhenPageHit::Back,
-          "when_page_hit (20, 30) Back");
-    check(when_page_hit(160, 90, w, h) == WhenPageHit::Mode,
-          "when_page_hit (160, 90) Mode");
-    check(when_page_hit(20, 150, w, h) == WhenPageHit::StartDown,
-          "when_page_hit (20, 150) StartDown");
-    check(when_page_hit(160, 150, w, h) == WhenPageHit::None,
-          "when_page_hit (160, 150) None");
-    check(when_page_hit(300, 150, w, h) == WhenPageHit::StartUp,
-          "when_page_hit (300, 150) StartUp");
-    check(when_page_hit(20, 210, w, h) == WhenPageHit::EndDown,
-          "when_page_hit (20, 210) EndDown");
-    check(when_page_hit(300, 210, w, h) == WhenPageHit::EndUp,
-          "when_page_hit (300, 210) EndUp");
-  }
-  {
     check(next_format(TimeFormat::Hidden) == TimeFormat::Hours,
           "next_format Hidden -> Hours");
     check(next_format(TimeFormat::HoursMinutesSeconds) == TimeFormat::Hidden,
           "next_format H:M:S -> Hidden");
-  }
-  {
-    const int w = 320;
-    const int h = 240;
-    check(ring_hit(40, 200, w, h) == RingHit::Snooze,
-          "ring_hit (40, 200) Snooze");
-    check(ring_hit(250, 200, w, h) == RingHit::Stop, "ring_hit (250, 200) Stop");
-    check(ring_hit(160, 200, w, h) == RingHit::None,
-          "ring_hit (160, 200) None");
-    check(ring_hit(40, 180, w, h) == RingHit::None, "ring_hit (40, 180) None");
   }
   {
     Alarm alarm = {{7, 0}, true, false};
@@ -434,25 +430,22 @@ int main() {
           "Stop during snooze ring clears snooze");
   }
   {
-    Settings ok = {};
-    ok.magic = kSettingsMagic;
-    ok.version = kSettingsVersion;
-    ok.alarm_hour = 7;
-    ok.volume = 80;
-    ok.soft_volume = 40;
-    ok.gentle_seconds = 30;
-    ok.day_format = 3;
-    ok.night_format = 3;
-    ok.night_start_hour = 21;
-    ok.night_end_hour = 7;
-    ok.day_bright = 70;
-    ok.night_bright = 20;
+    Settings ok = default_settings();
     check(settings_valid(ok), "settings_valid defaults");
     ok.magic = 1;
     check(!settings_valid(ok), "settings_valid rejects bad magic");
     ok.magic = kSettingsMagic;
     ok.soft_volume = 90;
     check(!settings_valid(ok), "settings_valid rejects soft above loud");
+    ok = default_settings();
+    ok.noise_timer = 17;
+    check(!settings_valid(ok), "settings_valid rejects a timer not on the list");
+    ok = default_settings();
+    ok.lamp_bright = 0;
+    check(!settings_valid(ok), "settings_valid rejects lamp brightness 0");
+    ok = default_settings();
+    ok.noise_kind = 3;
+    check(!settings_valid(ok), "settings_valid rejects an unknown sound");
   }
   {
     YmdHms got = parse_compile_stamp("Sep 22 2026", "18:05:09");
@@ -508,6 +501,271 @@ int main() {
           "next_color_mode Auto -> Day");
     check(next_color_mode(ColorMode::Night) == ColorMode::Auto,
           "next_color_mode Night -> Auto");
+  }
+
+  {
+    // Layout at the clock's screens, and a sweep of others
+    check_layout(320, 240);
+    check_layout(616, 284);
+    check_layout(600, 450);
+    check_layout(1232, 568);
+    for (int w = 160; w <= 1400; w += 97) {
+      for (int h = 120; h <= 900; h += 71) {
+        check_layout(w, h);
+      }
+    }
+    const Ui core = ui_for(320, 240);
+    check(core.scale == 100 && core.header == 40, "CoreS3 is the 100% layout");
+    const Ui big = ui_for(600, 450);
+    check(big.scale > 180 && big.header > 70, "600x450 scales up");
+    const Ui zero = ui_for(0, 0);
+    check(zero.w == 1 && zero.h == 1, "ui_for survives a zero screen");
+    check(tile_columns(ui_for(616, 284)) == 3 && tile_columns(ui_for(320, 240)) == 2,
+          "wide screens get three tile columns");
+  }
+  {
+    // Screens and navigation
+    check(parent_screen(Screen::NightHours) == Screen::NightScreen, "Night hours backs to Night screen");
+    check(parent_screen(Screen::Lamp) == Screen::Settings, "pages back to Settings");
+    check(parent_screen(Screen::Settings) == Screen::Clock, "Settings backs to the clock");
+    for (int i = 0; i < kMenuItems; ++i) {
+      RowKind kinds[kMaxRows];
+      check(page_rows(menu_item(i), kinds) > 0, "every menu item opens a page");
+      for (int j = i + 1; j < kMenuItems; ++j) {
+        check(menu_item(i) != menu_item(j), "menu items differ");
+      }
+    }
+    check(screen_preview(Screen::DayScreen) == 1 && screen_preview(Screen::NightHours) == 2 &&
+              screen_preview(Screen::Lamp) == 0,
+          "day and night pages preview their look");
+  }
+  {
+    // Sleep sounds
+    const NoiseKind kinds[] = {NoiseKind::White, NoiseKind::Pink, NoiseKind::Brown};
+    double ratio[3];
+    for (int k = 0; k < 3; ++k) {
+      NoiseGen g = noise_gen(99);
+      double sum = 0, sq = 0, diff = 0, prev = 0;
+      const int n = 200000;
+      for (int i = 0; i < n; ++i) {
+        const double v = noise_value(g, kinds[k]);
+        sum += v;
+        sq += v * v;
+        if (i) diff += (v - prev) * (v - prev);
+        prev = v;
+        check(v > -1.0 && v < 1.0, "noise stays in range");
+      }
+      const double rms = std::sqrt(sq / n);
+      check(std::fabs(sum / n) < 0.02, std::string(noise_key(kinds[k])) + " noise is centred");
+      check(rms > 0.12 && rms < 0.2, std::string(noise_key(kinds[k])) + " noise at the common level");
+      ratio[k] = diff / sq;
+    }
+    check(ratio[0] > 1.8, "white noise is flat");
+    check(ratio[1] < 0.6 * ratio[0] && ratio[1] > 0.1, "pink noise leans low");
+    check(ratio[2] < 0.3 * ratio[1], "brown noise leans lower still");
+    NoiseGen a = noise_gen(5), b = noise_gen(5);
+    int16_t x[64], y[64];
+    fill_noise(a, NoiseKind::Pink, x, 64, 1000, 1000);
+    fill_noise(b, NoiseKind::Pink, y, 64, 1000, 1000);
+    check(std::memcmp(x, y, sizeof(x)) == 0, "same seed, same noise");
+    NoiseGen z = noise_gen(0);
+    check(z.seed != 0, "a zero seed still makes noise");
+    fill_noise(a, NoiseKind::White, x, 64, 0, 0);
+    bool silent = true;
+    for (int16_t v : x) silent = silent && v == 0;
+    check(silent, "gain 0 is silence");
+    fill_noise(a, NoiseKind::White, x, 64, 0, 1000);
+    check(x[0] == 0 && std::abs(static_cast<int>(x[1])) < 1000, "a ramp starts from silence");
+    int16_t one;
+    fill_noise(a, NoiseKind::Brown, &one, 1, 0, 1000);
+    (void)one;
+
+    check(noise_gain_permille(0, 0) == 0, "fades in from 0");
+    check(noise_gain_permille(1500, 0) == 500, "halfway through the fade in");
+    check(noise_gain_permille(3000, 0) == 1000, "full after 3 s");
+    check(noise_gain_permille(4000000000u, 0) == 1000, "no timer plays forever");
+    check(noise_gain_permille(14 * 60000, 15) == 1000, "full until the last minute");
+    check(noise_gain_permille(14 * 60000 + 30000, 15) == 500, "half, 30 s from the end");
+    check(noise_gain_permille(15 * 60000, 15) == 0, "silent at the end");
+    check(noise_gain_permille(1000, 120) == 333, "the long timer doesn't overflow");
+    check(!noise_timer_done(15 * 60000 - 1, 15) && noise_timer_done(15 * 60000, 15),
+          "timer done at the end");
+    check(!noise_timer_done(4000000000u, 0), "no timer is never done");
+    check(noise_minutes_left(0, 15) == 15 && noise_minutes_left(1, 15) == 15 &&
+              noise_minutes_left(60000, 15) == 14 && noise_minutes_left(15 * 60000, 15) == 0 &&
+              noise_minutes_left(5, 0) == 0,
+          "minutes left round up");
+    check(step_timer(0, -1) == 0 && step_timer(0, 1) == 15 && step_timer(120, 1) == 120 &&
+              step_timer(60, 1) == 90 && step_timer(17, 1) == 30 && step_timer(17, 0) == 15,
+          "timer steps");
+    check(step_sunrise(0, 1) == 10 && step_sunrise(60, 1) == 60 && step_sunrise(10, -1) == 0,
+          "sunrise steps");
+    check(adjust_level(30, 5) == 35 && adjust_level(5, -5) == 5 && adjust_level(100, 5) == 100 &&
+              adjust_level(33, 5) == 40 && adjust_level(0, 0) == 5,
+          "levels step by 5 between 5 and 100");
+    check(std::strcmp(noise_label(next_noise(NoiseKind::Brown)), "White noise") == 0,
+          "sounds cycle");
+  }
+  {
+    // Lamp and sunrise
+    const Alarm on = {{7, 0}, true, false};
+    check(sunrise_permille(Hm{6, 39}, 59, on, 20) == 0, "dark before the ramp");
+    check(sunrise_permille(Hm{6, 40}, 0, on, 20) == 0, "the ramp starts at 0");
+    check(sunrise_permille(Hm{6, 50}, 0, on, 20) == 500, "half way");
+    check(sunrise_permille(Hm{6, 59}, 59, on, 20) == 999, "almost there");
+    check(sunrise_permille(Hm{7, 0}, 30, on, 20) == 1000, "full through the alarm minute");
+    check(sunrise_permille(Hm{7, 1}, 0, on, 20) == 0, "the ramp is before the alarm only");
+    check(sunrise_permille(Hm{6, 50}, 0, on, 0) == 0, "no sunrise when off");
+    check(sunrise_permille(Hm{6, 50}, 0, Alarm{{7, 0}, false, false}, 20) == 0, "none with the alarm off");
+    check(sunrise_permille(Hm{6, 50}, 0, Alarm{{7, 0}, true, true}, 20) == 0, "none before a skipped alarm");
+    check(sunrise_permille(Hm{23, 55}, 0, Alarm{{0, 10}, true, false}, 20) == 250, "across midnight");
+    int last = -1;
+    bool rising = true;
+    for (int s = 0; s < 20 * 60; ++s) {
+      const int v = sunrise_permille(step_minutes(Hm{6, 40}, s / 60), s % 60, on, 20);
+      rising = rising && v >= last && v <= 1000;
+      last = v;
+    }
+    check(rising, "the sunrise only brightens");
+    check(!wake_light_expired(Hm{7, 29}, Hm{7, 0}) && wake_light_expired(Hm{7, 30}, Hm{7, 0}),
+          "wake light lasts 30 minutes");
+    check(wake_light_expired(Hm{6, 0}, Hm{7, 0}), "a clock set back ends the wake light");
+    check(lamp_permille(false, 40, 0, false) == 0, "off");
+    check(lamp_permille(true, 40, 0, false) == 400, "on at 40%");
+    check(lamp_permille(true, 40, 700, false) == 700, "sunrise above the lamp's level wins");
+    check(lamp_permille(false, 40, 0, true) == 1000, "wake light is full");
+    check(lamp_permille(true, 250, 0, false) == 1000, "clamped");
+    check(lamp_duty(0) == 0 && lamp_duty(1) == 1 && lamp_duty(1000) == 255 && lamp_duty(-5) == 0 &&
+              lamp_duty(2000) == 255,
+          "lamp duty ends");
+    bool mono = true;
+    for (int p = 1; p <= 1000; ++p) mono = mono && lamp_duty(p) >= lamp_duty(p - 1);
+    check(mono, "lamp duty only rises");
+    check(lamp_duty(100) < 10, "the dim end has fine steps");
+    check(button_action(true, true) == ButtonAction::Snooze, "button snoozes a ringing alarm");
+    check(button_action(false, true) == ButtonAction::LampOff, "button puts a lit lamp out");
+    check(button_action(false, false) == ButtonAction::LampOn, "button lights the lamp");
+  }
+  {
+    // Serial commands
+    struct Case {
+      const char* line;
+      CmdKind kind;
+      int a, b, c;
+    };
+    const Case cases[] = {
+        {"", CmdKind::None, 0, 0, 0},
+        {"   ", CmdKind::None, 0, 0, 0},
+        {"help", CmdKind::Help, 0, 0, 0},
+        {"STATE", CmdKind::State, 0, 0, 0},
+        {"  lamp   on ", CmdKind::LampOn, 0, 0, 0},
+        {"lamp off", CmdKind::LampOff, 0, 0, 0},
+        {"lamp toggle", CmdKind::LampToggle, 0, 0, 0},
+        {"lamp 40", CmdKind::LampLevel, 40, 0, 0},
+        {"lamp 0", CmdKind::LampOff, 0, 0, 0},
+        {"lamp 100", CmdKind::LampLevel, 100, 0, 0},
+        {"lamp 101", CmdKind::Unknown, 0, 0, 0},
+        {"lamp 4000", CmdKind::Unknown, 0, 0, 0},
+        {"lamp", CmdKind::Unknown, 0, 0, 0},
+        {"lampon", CmdKind::Unknown, 0, 0, 0},
+        {"sound pink", CmdKind::SoundKind, 1, 0, 0},
+        {"sound Brown", CmdKind::SoundKind, 2, 0, 0},
+        {"sound white", CmdKind::SoundKind, 0, 0, 0},
+        {"sound on", CmdKind::SoundOn, 0, 0, 0},
+        {"sound off", CmdKind::SoundOff, 0, 0, 0},
+        {"sound toggle", CmdKind::SoundToggle, 0, 0, 0},
+        {"sound grey", CmdKind::Unknown, 0, 0, 0},
+        {"time 7:05", CmdKind::Time, 7, 5, 0},
+        {"time 23:59:58", CmdKind::Time, 23, 59, 58},
+        {"time 24:00", CmdKind::Unknown, 0, 0, 0},
+        {"time 12:60", CmdKind::Unknown, 0, 0, 0},
+        {"time 12:5", CmdKind::Unknown, 0, 0, 0},
+        {"time 12:05:61", CmdKind::Unknown, 0, 0, 0},
+        {"time 12:05 x", CmdKind::Unknown, 0, 0, 0},
+        {"alarm 06:30", CmdKind::AlarmAt, 6, 30, 0},
+        {"alarm 06:30:10", CmdKind::Unknown, 0, 0, 0},
+        {"alarm on", CmdKind::AlarmOn, 0, 0, 0},
+        {"alarm off", CmdKind::AlarmOff, 0, 0, 0},
+        {"go day", CmdKind::GoDay, 0, 0, 0},
+        {"go night", CmdKind::GoNight, 0, 0, 0},
+        {"go alarm", CmdKind::GoAlarm, 0, 0, 0},
+        {"go sunrise", CmdKind::GoSunrise, 0, 0, 0},
+        {"go", CmdKind::Unknown, 0, 0, 0},
+        {"go home", CmdKind::Unknown, 0, 0, 0},
+        {"button", CmdKind::Button, 0, 0, 0},
+        {"button twice", CmdKind::Unknown, 0, 0, 0},
+        {"reboot", CmdKind::Unknown, 0, 0, 0},
+    };
+    for (const Case& c : cases) {
+      const Command got = parse_command(c.line);
+      const bool args = c.kind == CmdKind::Unknown || c.kind == CmdKind::None ||
+                        (got.a == c.a && got.b == c.b && got.c == c.c);
+      check(got.kind == c.kind && args, std::string("parse_command(\"") + c.line + "\")");
+    }
+    LineReader r = {};
+    const char* feed = "lamp on\r\n\nsound off\n";
+    std::string lines;
+    for (const char* p = feed; *p; ++p) {
+      if (line_push(r, *p)) lines += std::string(r.buf) + "|";
+    }
+    check(lines == "lamp on|sound off|", "lines split on CR and LF, empty lines skipped: " + lines);
+    for (int i = 0; i < 200; ++i) line_push(r, 'x');
+    check(!line_push(r, '\n'), "an overlong line is dropped");
+    for (const char* p = "state"; *p; ++p) line_push(r, *p);
+    check(line_push(r, '\n') && std::strcmp(r.buf, "state") == 0, "and the next line works");
+  }
+  {
+    // Short times and labels
+    char buf[16];
+    format_hm_short(buf, sizeof(buf), Hm{21, 0}, HourCycle::H12);
+    check(std::strcmp(buf, "9PM") == 0, "format_hm_short 9PM");
+    format_hm_short(buf, sizeof(buf), Hm{0, 30}, HourCycle::H12);
+    check(std::strcmp(buf, "12:30AM") == 0, "format_hm_short 12:30AM");
+    format_hm_short(buf, sizeof(buf), Hm{7, 5}, HourCycle::H24);
+    check(std::strcmp(buf, "07:05") == 0, "format_hm_short 07:05");
+    check(minutes_until(Hm{23, 0}, Hm{1, 0}) == 120 && minutes_until(Hm{7, 0}, Hm{7, 0}) == 0,
+          "minutes_until wraps");
+  }
+  {
+    // Loading saved settings, including version 1 from earlier firmware
+    Settings s = default_settings();
+    s.alarm_hour = 5;
+    Settings out;
+    check(load_settings(&s, sizeof(s), &out) && out.alarm_hour == 5, "loads version 2");
+    check(!load_settings(&s, sizeof(s) - 1, &out), "rejects a short blob");
+    check(!load_settings(&s, 0, &out), "rejects nothing");
+    SettingsV1 v1;
+    std::memset(&v1, 0, sizeof(v1));
+    v1.magic = kSettingsMagic;
+    v1.version = 1;
+    v1.alarm_hour = 6;
+    v1.alarm_minute = 45;
+    v1.alarm_enabled = 1;
+    v1.volume = 90;
+    v1.soft_volume = 30;
+    v1.gentle_seconds = 20;
+    v1.day_format = 3;
+    v1.night_format = 1;
+    v1.color_mode = 2;
+    v1.night_start_hour = 22;
+    v1.night_end_hour = 6;
+    v1.day_bright = 80;
+    v1.night_bright = 10;
+    v1.hour12 = 1;
+    check(load_settings(&v1, sizeof(v1), &out), "upgrades version 1");
+    check(out.version == kSettingsVersion && out.alarm_hour == 6 && out.alarm_minute == 45 &&
+              out.volume == 90 && out.night_format == 1 && out.color_mode == 2 && out.hour12 == 1 &&
+              out.night_bright == 10,
+          "version 1 values carried over");
+    check(out.noise_volume == default_settings().noise_volume && out.lamp_on == 0,
+          "new values get defaults");
+    v1.alarm_hour = 30;
+    check(!load_settings(&v1, sizeof(v1), &out), "a bad version 1 blob is rejected");
+    v1.alarm_hour = 6;
+    v1.version = 7;
+    check(!load_settings(&v1, sizeof(v1), &out), "an unknown version is rejected");
+    const Alarm a = alarm_of(default_settings());
+    check(a.at.hour == 7 && a.at.minute == 0 && !a.enabled && !a.skip_next, "alarm_of defaults");
   }
 
   return failures;

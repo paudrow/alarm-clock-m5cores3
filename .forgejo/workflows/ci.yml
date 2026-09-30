@@ -20,13 +20,24 @@ jobs:
           fi
       - name: behavior tests
         run: g++ -std=c++11 -Wall -Wextra -Werror -I include test/alarm_face_test.cpp -o /tmp/alarm_face_test && /tmp/alarm_face_test
+      - name: firmware tests
+        # The real src/main.cpp, run on the PC through the simulator's shim (test/host/)
+        run: |
+          g++ -std=c++11 -Wall -Wextra -Werror -O1 -I include -I sim/shim -c src/main.cpp -o /tmp/main.o
+          g++ -std=c++11 -Wall -Wextra -Werror -O1 -I sim/shim -c sim/sim.cpp -o /tmp/sim.o
+          g++ -std=c++17 -Wall -Wextra -Werror -O1 -I include -I sim/shim -I test/host -c test/host/host.cpp -o /tmp/host.o
+          g++ -std=c++17 -Wall -Wextra -Werror -O1 -I include -I test/host test/firmware_test.cpp /tmp/main.o /tmp/sim.o /tmp/host.o -o /tmp/firmware_test
+          /tmp/firmware_test
       - name: screen pictures
         run: |
-          g++ -std=c++11 -Wall -Wextra -Werror -I include test/render_screens.cpp -o /tmp/render_screens
+          g++ -std=c++17 -Wall -Wextra -Werror -O1 -I include -I test/host test/render_screens.cpp /tmp/main.o /tmp/sim.o /tmp/host.o -o /tmp/render_screens
           rm -rf /tmp/screens
           mkdir /tmp/screens
           /tmp/render_screens /tmp/screens
-          diff -ru test/screens /tmp/screens
+          if ! diff -r test/screens /tmp/screens; then
+            echo "The screens changed. If that's intended, run the lines above with test/screens as the directory and commit the pictures."
+            exit 1
+          fi
 
   simulator:
     runs-on: ubuntu-latest
@@ -53,3 +64,27 @@ jobs:
           fi
       - name: simulator smoke test
         run: node sim/smoke_test.js
+
+  firmware:
+    # Builds the real CoreS3 firmware with PlatformIO, so an M5Unified call the
+    # simulator's shim accepts but the real library doesn't is caught here.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: pio-${{ hashFiles('platformio.ini') }}
+      - name: platformio
+        run: |
+          if ! python3 -m pip --version >/dev/null 2>&1; then
+            if [ "$(id -u)" -eq 0 ]; then
+              apt-get update && apt-get install -y python3-pip
+            else
+              sudo apt-get update && sudo apt-get install -y python3-pip
+            fi
+          fi
+          python3 -m pip install --user --break-system-packages platformio \
+            || python3 -m pip install --user platformio
+      - name: build for the CoreS3
+        run: python3 -m platformio run
