@@ -31,7 +31,9 @@ The clock reads these over USB serial (115200 baud), and the simulator, tests an
 | `sound on`, `sound off`, `sound toggle`, `sound white`/`pink`/`brown` | Sleep sounds |
 | `time HH:MM[:SS]` | Sets the clock |
 | `alarm HH:MM`, `alarm on`, `alarm off` | Sets and turns on the alarm |
-| `go day`, `go night`, `go sunrise`, `go alarm` | Jumps the time: noon; the middle of the night hours; the start of the sunrise; 10 s before the alarm (turning it on) |
+| `winddown on`, `winddown off`, `winddown HH:MM HH:MM` | The evening lamp: on from the first time, fading out over the last 15 minutes to off at the second |
+| `wake on`, `wake off`, `wake <before> <after>` | The wake-up light: minutes before the alarm to brighten over, and minutes after to stay on (0, 10, 15, 20, 30, 45 or 60) |
+| `go day`, `go night`, `go winddown`, `go sunrise`, `go alarm` | Jumps the time: noon; the middle of the night hours; the start of wind down; the start of the wake-up light; 10 s before the alarm (each turns on what it needs) |
 | `button` | Presses the button: snooze while ringing, otherwise the lamp |
 | `state` | Prints the state as one line of JSON |
 | `help` | Lists these |
@@ -54,7 +56,7 @@ python hardware/cad/viewer.py   # re-embeds it in the viewer
 
 `clock.wasm` is committed so the viewer can be rebuilt without Zig. **Rebuild and commit it whenever `src/main.cpp` or `include/` changes.** The build is reproducible: `build.py` pins the firmware's `__DATE__`/`__TIME__` stamp, and the Zig version is pinned. The same source therefore always gives the same bytes.
 
-The same shim also builds natively. `test/host/` implements the JavaScript side in C++, so `test/firmware_test.cpp` can run the real firmware on a PC: it taps through every page at ten screen sizes, checks every draw call stays on screen and every label fits its row, rings, snoozes and stops alarms, streams sleep sounds through their fade and timer, runs sunrises, reboots with saved (and corrupt, and version 1) settings, and throws thousands of random inputs at it. `test/render_screens.cpp` draws every screen to `test/screens/`. The build lines are in `.github/workflows/ci.yml`.
+The same shim also builds natively. `test/host/` implements the JavaScript side in C++, so `test/firmware_test.cpp` can run the real firmware on a PC: it taps through every page at ten screen sizes, checks every draw call stays on screen and every label fits its row, rings, snoozes and stops alarms, streams sleep sounds through their fade and timer, runs the wind-down and wake-up lamp schedules, reboots with saved (and corrupt, and older versions') settings, and throws thousands of random inputs at it. `test/render_screens.cpp` draws every screen to `test/screens/`. The build lines are in `.github/workflows/ci.yml`.
 
 ## CI
 

@@ -46,6 +46,12 @@ void open(const Ui& u, Screen s) {
     tap_box(row_box(u, 2, page_rows(Screen::NightScreen, kinds)));
     return;
   }
+  if (s == Screen::WindDown || s == Screen::WakeUp) {
+    open(u, Screen::Lamp);
+    RowKind kinds[kMaxRows];
+    tap_box(row_box(u, s == Screen::WindDown ? 2 : 3, page_rows(Screen::Lamp, kinds)));
+    return;
+  }
   for (int i = 0; i < kMenuItems; ++i)
     if (menu_item(i) == s) tap_box(tile_box(u, i, kMenuItems));
 }
@@ -74,7 +80,8 @@ void render(int w, int h) {
   host::command("time 12:00:00");
   const Screen pages[] = {Screen::Settings,    Screen::Alarm, Screen::AlarmSound,
                           Screen::SleepSounds, Screen::Lamp,  Screen::DayScreen,
-                          Screen::NightScreen, Screen::NightHours};
+                          Screen::NightScreen, Screen::NightHours, Screen::WindDown,
+                          Screen::WakeUp};
   for (Screen s : pages) {
     open(u, s);
     save(size + "-" + screen_key(s));
