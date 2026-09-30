@@ -1060,7 +1060,8 @@ class ClockSim {
       js_pref_get(k, kl, buf, cap) {
         let v = null; try { v = localStorage.getItem(prefKey(k, kl)); } catch (e) {}
         if (!v) return 0;
-        const raw = atob(v); const len = Math.min(cap, raw.length); const out = new Uint8Array(mem.buffer, buf, len);
+        const raw = atob(v); if (raw.length > cap) return 0; // like ESP32 Preferences
+        const len = raw.length; const out = new Uint8Array(mem.buffer, buf, len);
         for (let i = 0; i < len; i++) out[i] = raw.charCodeAt(i);
         return len;
       },

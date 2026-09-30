@@ -16,12 +16,17 @@ constexpr int kLampPin = 9;
 constexpr uint8_t kAlarmChannel = 0;
 constexpr uint8_t kNoiseChannel = 1;
 constexpr uint32_t kNoiseRate = 24000;
-constexpr size_t kNoiseChunk = 1024;  // ~43 ms; two are queued at a time
+// ~170 ms. M5Unified queues at most two buffers per channel, so each must
+// outlast the slowest loop (a full redraw, a flash write) or the sound gaps.
+constexpr size_t kNoiseChunk = 4096;
 constexpr int kNoiseBuffers = 3;
 
 constexpr uint32_t kIdleMs = 60000;  // settings pages go back to the clock
 constexpr uint32_t kRepeatDelayMs = 400;
 constexpr uint32_t kRepeatMs = 110;
+// Settings are written this long after the last change, so holding a stepper
+// doesn't write flash ten times a second (and stall the sleep sounds).
+constexpr uint32_t kSaveDelayMs = 1500;
 
 struct Palette {
   uint16_t bg;
@@ -110,6 +115,9 @@ struct App {
   RowText last_rows[kMaxRows];
   TileText last_tiles[kMenuItems];
 
+  Settings pending;
+  uint32_t changed_ms;
+
   LineReader line;
   int last_logged_second;
   bool pending_snooze;
@@ -150,6 +158,14 @@ void fill_box(Box b, uint16_t c) {
   if (b.w > 0 && b.h > 0) {
     M5.Display.fillRect(b.x, b.y, b.w, b.h, c);
   }
+}
+
+Box clamp_box(const Ui& ui, Box b) {
+  const int x0 = b.x < 0 ? 0 : b.x;
+  const int y0 = b.y < 0 ? 0 : b.y;
+  const int x1 = b.x + b.w > ui.w ? ui.w : b.x + b.w;
+  const int y1 = b.y + b.h > ui.h ? ui.h : b.y + b.h;
+  return Box{x0, y0, x1 - x0, y1 - y0};
 }
 
 Box inset(Box b, int d) { return Box{b.x + d, b.y + d, b.w - 2 * d, b.h - 2 * d}; }
@@ -819,7 +835,8 @@ void draw_digits(const Ui& ui, const ClockView& v, bool force) {
   const int total_w = dw + gap + pw;
   const int cx = area.x + area.w / 2;
   const int cy = area.y + area.h / 2;
-  const Box now = {cx - total_w / 2, cy - dh / 2, total_w, dh};
+  // Padded, so a pixel of rounding in the scaled font's width is still cleared.
+  const Box now = clamp_box(ui, Box{cx - total_w / 2 - 2, cy - dh / 2 - 1, total_w + 4, dh + 2});
   const bool moved = now.x != app.last_digits.x || now.y != app.last_digits.y ||
                      now.w != app.last_digits.w || now.h != app.last_digits.h;
   if (moved || force) {
@@ -829,13 +846,14 @@ void draw_digits(const Ui& ui, const ClockView& v, bool force) {
   M5.Display.setTextDatum(middle_center);
   M5.Display.setFont(font8 ? &fonts::Font8 : &fonts::Font7);
   M5.Display.setTextSize(scale);
-  M5.Display.drawString(v.digits, now.x + dw / 2, cy);
+  const int left = cx - total_w / 2;
+  M5.Display.drawString(v.digits, left + dw / 2, cy);
   M5.Display.setTextSize(1);
   if (period[0]) {
     fit_text(period, sizeof(period), area.w / 4, period_px, true);
     M5.Display.setTextColor(p.ink, p.bg);
     M5.Display.setTextDatum(middle_left);
-    M5.Display.drawString(period, now.x + dw + gap, cy);
+    M5.Display.drawString(period, left + dw + gap, cy);
   }
   app.last_digits = now;
 }
@@ -897,7 +915,7 @@ void drive_speaker(Intensity heard, int loud_percent, int soft_percent) {
     return;
   }
   const uint32_t now = millis();
-  if (now < app.next_beep_at) {
+  if (static_cast<int32_t>(now - app.next_beep_at) < 0) {
     return;
   }
   if (heard == Intensity::Gentle) {
@@ -1003,6 +1021,7 @@ void update_lamp(const m5::rtc_datetime_t& dt) {
 void go(Screen s) {
   app.screen = s;
   app.enter = true;
+  app.press = Hit{Part::None, -1};  // a finger still down from the last screen isn't a press here
 }
 
 void set_clock_time(int h, int m, int s) {
@@ -1140,7 +1159,9 @@ void handle_touch(const Ui& ui, bool* stop, bool* snooze, Intensity* preview) {
     } else {
       switch (clock_hit(ui, t.x, t.y)) {
         case ClockHit::Gear:
-          go(Screen::Settings);
+          if (app.occurrence != Occurrence::Ringing) {
+            go(Screen::Settings);  // not while ringing: Snooze and Stop stay on screen
+          }
           break;
         case ClockHit::Bell:
           app.cfg.alarm_enabled = app.cfg.alarm_enabled ? 0 : 1;
@@ -1187,7 +1208,8 @@ void handle_touch(const Ui& ui, bool* stop, bool* snooze, Intensity* preview) {
   const bool stepper = hit.part == Part::Minus || hit.part == Part::Plus;
   const bool same = hit.part == app.press.part && hit.row == app.press.row;
   if (stepper && same &&
-      (edge || (t.isPressed() && millis() >= app.next_repeat))) {
+      (edge || (t.isPressed() &&
+                static_cast<int32_t>(millis() - app.next_repeat) >= 0))) {
     on_row(app.screen, hit.row, hit.part, preview);
     app.next_repeat = millis() + (edge ? kRepeatDelayMs : kRepeatMs);
   } else if (edge) {
@@ -1456,7 +1478,7 @@ void loop() {
   app.snooze_at = step.snooze_at;
   if (app.occurrence == Occurrence::Ringing && before != Occurrence::Ringing) {
     stop_noise();
-    if (app.cfg.sunrise_minutes > 0) {
+    if (app.cfg.sunrise_minutes > 0 && !app.sunrise_dismissed) {
       app.wake_light = true;
     }
     if (app.screen != Screen::Clock) {
@@ -1535,8 +1557,14 @@ void loop() {
         app.noise_on ? noise_key(static_cast<NoiseKind>(app.cfg.noise_kind)) : "off");
   }
 
+  if (std::memcmp(&app.cfg, &app.pending, sizeof(Settings)) != 0) {
+    app.pending = app.cfg;
+    app.changed_ms = millis();
+  }
+  const bool never_saved = app.stored.magic != kSettingsMagic;
   if (std::memcmp(&app.cfg, &app.stored, sizeof(Settings)) != 0 &&
-      settings_valid(app.cfg)) {
+      settings_valid(app.cfg) &&
+      (never_saved || millis() - app.changed_ms >= kSaveDelayMs)) {
     Preferences prefs;
     if (prefs.begin("alarmclk", false)) {
       prefs.putBytes("cfg", &app.cfg, sizeof(Settings));

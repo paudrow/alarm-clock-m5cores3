@@ -59,9 +59,9 @@ function boot(w, h, prefs = {}) {
     js_pref_get: (k, kl, buf, cap) => {
       const v = sim.prefs[str(k, kl)];
       if (!v) return 0;
-      const n = Math.min(cap, v.length);
-      new Uint8Array(mem.buffer, buf, n).set(v.subarray(0, n));
-      return n;
+      if (v.length > cap) return 0; // like ESP32 Preferences: a blob bigger than the buffer isn't read
+      new Uint8Array(mem.buffer, buf, v.length).set(v);
+      return v.length;
     },
     js_pref_set: (k, kl, buf, n) => { sim.prefs[str(k, kl)] = new Uint8Array(mem.buffer, buf, n).slice(); },
     js_analog_write: (pin, v) => { check("analogWrite", pin, v); if (v < 0 || v > 255) sim.bad.push(`analogWrite ${v}`); if (pin === LAMP_PIN) sim.lamp = v; },

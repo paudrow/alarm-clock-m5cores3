@@ -111,6 +111,7 @@ inline ColorMode next_color_mode(ColorMode mode) {
 }
 
 inline Hm step_minutes(Hm t, int delta);
+inline int minutes_until(Hm from, Hm to);
 
 inline bool hm_equal(Hm a, Hm b) {
   return a.hour == b.hour && a.minute == b.minute;
@@ -131,8 +132,13 @@ inline Step step_alarm(Occurrence occurrence, Alarm alarm, Inputs in) {
   if ((occurrence == Occurrence::Ringing || occurrence == Occurrence::Silenced ||
        occurrence == Occurrence::Skipped) &&
       !on_alarm && !on_snooze) {
+    // A snooze whose minute has just passed is used up, answered or not.
+    const bool snooze_spent =
+        in.snooze_armed && minutes_until(in.snooze_at, in.now) >= 1 &&
+        minutes_until(in.snooze_at, in.now) <= kSnoozeMinutes;
     return finish_step(Occurrence::Armed, Intensity::Silent, alarm.skip_next,
-                       in.snooze_armed, in.snooze_at);
+                       in.snooze_armed && !snooze_spent,
+                       snooze_spent ? Hm{0, 0} : in.snooze_at);
   }
   if (!alarm.enabled &&
       (occurrence == Occurrence::Ringing || in.snooze_armed)) {

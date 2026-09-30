@@ -328,11 +328,9 @@ void sleep_sounds_stream_fade_and_time_out() {
     late_rms = r.rms;
   }
   check(first_rms < late_rms * 0.5, "fades in");
+  check(st.underruns[1] == 0, "never runs dry");
   check(late_rms > 2000, "audible once faded in");
-  // No gaps: the queue never runs dry while playing.
-  double covered = 0;
-  for (const host::Raw& r : st.raws) covered += 1000.0 * r.count / r.rate;
-  check(covered >= st.ms - 400, "keeps the speaker fed");
+  no_bad_draws("noise buffers");
   // Volume follows the setting
   const int vol_before = st.raws.back().volume;
   center_tap(part(Screen::SleepSounds, 1, Part::Plus));
@@ -348,6 +346,94 @@ void sleep_sounds_stream_fade_and_time_out() {
   host::frames(100);
   check(st.raws.size() == n, "nothing more is streamed");
   no_bad_draws("sleep sounds");
+}
+
+// A slow loop (a full redraw, a flash write) mustn't starve the speaker or
+// make the firmware reuse a buffer it's still playing.
+void sleep_sounds_survive_slow_loops() {
+  for (int dt : {40, 90, 120, 150}) {
+    current = "slow loops " + std::to_string(dt) + " ms";
+    fresh(320, 240);
+    host::command("sound on");
+    host::frames(4000 / dt + 1, dt);  // past the fade in
+    const int before = st.underruns[1];
+    host::frames(20000 / dt, dt);
+    check(st.underruns[1] == before, "no gaps");
+    for (int i = 0; i < 40; ++i) {  // screens changing while it plays
+      center_tap(clock_icon_box(ui(), ClockHit::Gear));
+      center_tap(header_back_box(ui()));
+    }
+    no_bad_draws("slow loops");
+  }
+}
+
+void review_regressions() {
+  current = "no phantom stepper press";
+  fresh(320, 240);
+  open(Screen::Alarm);
+  center_tap(part(Screen::Alarm, 1, Part::Plus));
+  host::frames(61000 / 16);  // idle back to the clock
+  check(screen() == "clock", "idled home");
+  const std::string before = host::jget(host::state(), "lamp", "brightness");
+  open(Screen::Lamp);
+  host::frames(60);
+  check(host::jget(host::state(), "lamp", "brightness") == before, "opening a page changes nothing");
+  // Holding a finger down across a page change doesn't press what's under it.
+  const Box tile = tile_box(ui(), 3, kMenuItems);
+  center_tap(header_back_box(ui()));
+  host::touch(tile.x + tile.w - 3, tile.y + tile.h / 2, true);
+  host::frames(80);
+  host::touch(0, 0, false);
+  host::frames(2);
+  check(host::jget(host::state(), "lamp", "brightness") == before, "a held finger doesn't repeat on the new page");
+
+  current = "can't leave a ringing alarm";
+  fresh(320, 240);
+  host::command("go alarm");
+  host::frames(12000 / 16);
+  center_tap(clock_icon_box(ui(), ClockHit::Gear));
+  check(screen() == "clock", "the gear does nothing while ringing");
+
+  current = "dismissed sunrise stays dark";
+  fresh(320, 240);
+  host::command("alarm 07:00");
+  host::command("go sunrise");
+  host::frames(5 * 60 * 1000 / 250, 250);
+  center_tap(clock_icon_box(ui(), ClockHit::Lamp));
+  host::set_clock(6, 59, 55);
+  host::frames(600);
+  check(host::jget(host::state(), "alarm", "state") == "ringing", "rings");
+  check(host::lamp_duty() == 0, "no wake light after the sunrise was put out");
+
+  current = "unanswered snooze ends";
+  fresh(320, 240);
+  host::command("alarm 06:30");
+  host::command("time 06:30:00");
+  host::frames(60);
+  host::button();  // snooze to 06:39
+  host::set_clock(6, 31, 0);
+  host::frames(3);
+  host::set_clock(6, 39, 0);
+  host::frames(60);
+  check(host::jget(host::state(), "alarm", "state") == "ringing", "snooze rings");
+  host::set_clock(6, 40, 1);  // nobody answered
+  host::frames(3);
+  std::string s = host::state();
+  check(host::jget(s, "alarm", "snooze") == "null", "the snooze is used up: " + s);
+  host::set_clock(6, 38, 59);  // the next day, just before 06:39
+  st.clock_s += 86400;
+  host::frames(120);
+  check(host::jget(host::state(), "alarm", "state") == "armed", "no ring at 06:39 the next day");
+
+  current = "saves are batched";
+  fresh(320, 240);
+  const auto saved = st.prefs["alarmclk/cfg"];
+  open(Screen::Alarm);
+  const Box plus = part(Screen::Alarm, 2, Part::Plus);
+  host::hold(plus.x + plus.w / 2, plus.y + plus.h / 2, 1000);
+  check(st.prefs["alarmclk/cfg"] == saved, "nothing written while holding +");
+  host::frames(2000 / 16);
+  check(st.prefs["alarmclk/cfg"] != saved, "written once it settles");
 }
 
 void sleep_sounds_stop_when_the_alarm_rings() {
@@ -496,7 +582,7 @@ void settings_survive_a_reboot() {
     host::command("sound white");
     open(Screen::DayScreen);
     center_tap(part(Screen::DayScreen, 2, Part::Whole));  // 12-hour
-    host::frames(2);
+    host::frames(2000 / 16);  // saves settle
     host::boot(wh.first, wh.second);
     host::frames(2);
     const std::string s = host::state();
@@ -641,6 +727,8 @@ int main() {
   holding_a_stepper_repeats();
   sleep_sounds_stream_fade_and_time_out();
   sleep_sounds_stop_when_the_alarm_rings();
+  sleep_sounds_survive_slow_loops();
+  review_regressions();
   sound_icon_toggles_noise();
   lamp_icon_button_and_commands();
   sunrise_ramps_the_lamp_before_the_alarm();

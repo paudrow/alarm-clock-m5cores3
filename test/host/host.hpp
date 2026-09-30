@@ -61,6 +61,8 @@ struct State {
   double busy_until[8] = {0};
   int queued[8] = {0};
   std::vector<double> queue_end[8];
+  int underruns[8] = {0};        // the speaker ran dry between buffers
+  double last_end[8] = {0};
   std::vector<std::string> log;
   std::vector<std::string> bad;  // invariant violations
   std::vector<Text> texts;       // text on screen: drawn since the screen was last cleared

@@ -175,6 +175,26 @@ void advance(int dt_ms) {
 bool touch_down = false;
 int touch_x = 0, touch_y = 0;
 
+// Buffers the speaker is still playing, with a copy of what they held: the
+// firmware must not write into one until it has finished.
+struct Playing {
+  double end;
+  const int16_t* ptr;
+  std::vector<int16_t> copy;
+};
+std::vector<Playing> playing[8];
+
+void check_playing(int ch) {
+  auto& v = playing[ch];
+  v.erase(std::remove_if(v.begin(), v.end(), [](const Playing& p) { return p.end <= st.ms; }), v.end());
+  for (const Playing& p : v) {
+    if (std::memcmp(p.ptr, p.copy.data(), p.copy.size() * sizeof(int16_t)) != 0) {
+      st.bad.push_back("a sound buffer was rewritten while the speaker was still playing it");
+      break;
+    }
+  }
+}
+
 }  // namespace
 
 void boot(int w, int h, int year, int month, int day, int hour, int minute, int second) {
@@ -196,7 +216,12 @@ void boot(int w, int h, int year, int month, int day, int hour, int minute, int 
   st.pins.clear();
   st.tones.clear();
   st.raws.clear();
-  for (int i = 0; i < 8; ++i) st.queue_end[i].clear();
+  for (int i = 0; i < 8; ++i) {
+    st.queue_end[i].clear();
+    host::playing[i].clear();
+    st.underruns[i] = 0;
+    st.last_end[i] = 0;
+  }
   st.log.clear();
   st.bad.clear();
   st.texts.clear();
@@ -500,7 +525,11 @@ void js_tone(int freq, int ms, int volume, int channel) {
 
 void js_stop_tone(int channel) {
   for (int i = 0; i < 8; ++i)
-    if (channel < 0 || channel == i) st.queue_end[i].clear();
+    if (channel < 0 || channel == i) {
+      st.queue_end[i].clear();
+      host::playing[i].clear();
+      st.last_end[i] = 0;
+    }
 }
 
 void js_play_raw(int channel, const int16_t* samples, int count, int rate, int volume) {
@@ -508,9 +537,14 @@ void js_play_raw(int channel, const int16_t* samples, int count, int rate, int v
     st.bad.push_back("playRaw with bad arguments");
     return;
   }
+  host::check_playing(channel);
   auto& q = st.queue_end[channel];
+  q.erase(std::remove_if(q.begin(), q.end(), [](double end) { return end <= st.ms; }), q.end());
+  if (q.empty() && st.last_end[channel] > 0 && st.ms > st.last_end[channel] + 1) ++st.underruns[channel];
   const double start = q.empty() ? st.ms : std::max(st.ms, q.back());
   q.push_back(start + 1000.0 * count / rate);
+  st.last_end[channel] = q.back();
+  host::playing[channel].push_back(host::Playing{q.back(), samples, std::vector<int16_t>(samples, samples + count)});
   int peak = 0;
   double sum = 0;
   for (int i = 0; i < count; ++i) {
@@ -522,6 +556,7 @@ void js_play_raw(int channel, const int16_t* samples, int count, int rate, int v
 
 int js_channel_busy(int channel) {
   if (channel < 0 || channel >= 8) return 0;
+  host::check_playing(channel);
   auto& q = st.queue_end[channel];
   q.erase(std::remove_if(q.begin(), q.end(), [](double end) { return end <= st.ms; }), q.end());
   return static_cast<int>(std::min<size_t>(q.size(), 2));
