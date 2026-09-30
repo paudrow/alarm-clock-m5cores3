@@ -908,7 +908,7 @@ void drive_speaker(Intensity heard, int loud_percent, int soft_percent) {
   if (heard != app.heard) {
     M5.Speaker.stop(kAlarmChannel);
     app.heard = heard;
-    app.next_beep_at = 0;
+    app.next_beep_at = millis();  // beep now; not 0, which reads as the future past 2^31 ms
     app.loud_high = false;
   }
   if (heard == Intensity::Silent) {

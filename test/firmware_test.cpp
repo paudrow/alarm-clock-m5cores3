@@ -425,6 +425,17 @@ void review_regressions() {
   host::frames(120);
   check(host::jget(host::state(), "alarm", "state") == "armed", "no ring at 06:39 the next day");
 
+  current = "rings after 25 days of uptime";
+  for (double up : {2147483648.0 + 5000, 4294967296.0 - 3000}) {  // past 2^31 ms; just before millis() wraps
+    fresh(320, 240);
+    st.ms = up;
+    host::command("go alarm");
+    const size_t tones = st.tones.size();
+    host::frames(15000 / 16);
+    check(host::jget(host::state(), "alarm", "state") == "ringing", "rings");
+    check(st.tones.size() > tones + 5, "and beeps, at " + std::to_string(up) + " ms up");
+  }
+
   current = "saves are batched";
   fresh(320, 240);
   const auto saved = st.prefs["alarmclk/cfg"];
