@@ -210,8 +210,9 @@ code { font-family: var(--font-data); font-size: 12px; }
             <div class="mini-label" id="go-label">Jump to</div>
             <div class="seg" role="group" aria-labelledby="go-label">
               <button type="button" data-go="day">Daytime</button>
+              <button type="button" data-go="winddown">Wind down</button>
               <button type="button" data-go="night">Night</button>
-              <button type="button" data-go="sunrise">Sunrise</button>
+              <button type="button" data-go="sunrise">Wake up</button>
               <button type="button" data-go="alarm">Alarm</button>
             </div>
           </div>
@@ -243,7 +244,7 @@ code { font-family: var(--font-data); font-size: 12px; }
             <button type="button" class="link-btn" id="sim-reset">Reset its settings</button>
           </div>
         </div>
-        <p class="note">This is the clock's real firmware, <code>src/main.cpp</code>, compiled to WebAssembly. It draws here and on the model's screen, drives the lamp in the glass and plays the sleep sounds. On the model, click the screen to use it, the glass to switch the lamp, the speaker for sleep sounds and the top button to snooze. <b>Jump to</b> moves the clock's time: <b>Alarm</b> turns the alarm on and sets the clock 10 seconds before it. The Serial box takes the same commands as the real clock's USB console; so does <code>clock.command()</code> in the browser console. Settings are kept in this browser, the way the clock keeps them through a power cut.</p>
+        <p class="note">This is the clock's real firmware, <code>src/main.cpp</code>, compiled to WebAssembly. It draws here and on the model's screen, drives the lamp in the glass and plays the sleep sounds. On the model, click the screen to use it, the glass to switch the lamp, the speaker for sleep sounds and the top button to snooze. <b>Jump to</b> moves the clock's time. <b>Wind down</b> and <b>Wake up</b> turn those lamp schedules on and jump to their start; <b>Alarm</b> turns the alarm on and sets the clock 10 seconds before it. The Serial box takes the same commands as the real clock's USB console; so does <code>clock.command()</code> in the browser console. Settings are kept in this browser, the way the clock keeps them through a power cut.</p>
       </section>
 
       <section class="card" aria-labelledby="h-fit">
@@ -1173,9 +1174,13 @@ function showSimState() {
     ? `${s.alarm.at}, ${s.alarm.snooze ? `snoozed to ${s.alarm.snooze}` : ALARM_STATES[s.alarm.state] || s.alarm.state}${s.alarm.skip_next ? ", skipping next" : ""}`
     : `${s.alarm.at}, off`;
   const lampPct = Math.round(s.lamp.level / 10);
+  const manual = s.lamp.on ? s.lamp.brightness * 10 : 0;
+  const why = s.lamp.level <= manual ? "" : s.lamp.winding_down ? ` (wind down until ${s.wind_down.end})`
+    : s.lamp.wake_hold ? " (after the alarm)" : " (waking up)";
+  const plans = [s.wind_down.on && `wind down ${s.wind_down.start}–${s.wind_down.end}`,
+    s.wake_up.on && `wake up ${s.wake_up.before} min before`].filter(Boolean).join(", ");
   document.getElementById("sim-lamp").textContent = s.lamp.level > 0
-    ? `On, ${lampPct}%${s.lamp.wake ? " (wake light)" : s.lamp.level > (s.lamp.on ? s.lamp.brightness * 10 : 0) ? " (sunrise)" : ""}`
-    : s.lamp.sunrise ? `Off, sunrise ${s.lamp.sunrise} min before the alarm` : "Off";
+    ? `On, ${lampPct}%${why}` : plans ? `Off; ${plans}` : "Off";
   document.getElementById("sim-sound").textContent = s.sound.playing
     ? `${s.sound.kind[0].toUpperCase() + s.sound.kind.slice(1)} noise, ${s.sound.volume}%${s.sound.minutes_left ? `, ${s.sound.minutes_left} min left` : ""}`
     : "Off";
@@ -1307,7 +1312,7 @@ function modelPoint(e) {
 const lampAction = { hint: "click to switch the lamp", run: () => sim.command("lamp toggle") };
 const soundAction = { hint: "click for sleep sounds", run: () => sim.command("sound toggle") };
 const screenAction = { hint: "click to use the screen", run: () => enterInteract() };
-const GO_CYCLE = ["day", "night", "sunrise", "alarm"];
+const GO_CYCLE = ["day", "winddown", "night", "sunrise", "alarm"];
 let goNext = 0;
 const PART_ACTIONS = {
   glass_base: lampAction, leds: lampAction, glass_sample: lampAction, led_stars: lampAction, lamp_cradle: lampAction,
@@ -1315,7 +1320,7 @@ const PART_ACTIONS = {
   speaker: soundAction, chamber: soundAction, spk_box: soundAction, spk_lid: soundAction, spk_ring: soundAction, spk_filler: soundAction, amp: soundAction,
   screen: screenAction, screen_frame: screenAction, tdisplay: screenAction, display_stand: screenAction,
   button: { hint: "click to press: snooze, or the lamp", run: () => pressButton() },
-  rtc: { hint: "click to jump the time: day, night, sunrise, alarm", run: () => { sim.command(`go ${GO_CYCLE[goNext]}`); goNext = (goNext + 1) % GO_CYCLE.length; } }
+  rtc: { hint: "click to jump the time: day, wind down, night, wake up, alarm", run: () => { sim.command(`go ${GO_CYCLE[goNext]}`); goNext = (goNext + 1) % GO_CYCLE.length; } }
 };
 let clickStart = null;
 

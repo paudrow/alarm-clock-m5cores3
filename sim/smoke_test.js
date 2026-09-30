@@ -126,6 +126,12 @@ for (const [w, h] of [[616, 284], [600, 450], [320, 240]]) {
   expect(ringing.alarm.state === "ringing", `${label}: go alarm didn't ring (${ringing.alarm.state})`);
   expect(!ringing.sound.playing, `${label}: sleep sounds kept playing through the alarm`);
   expect(sim.tones.some((t) => t.ch === 0), `${label}: no alarm beeps`);
+  sim.command("go winddown");
+  sim.step(0, 0, false);
+  const wd = sim.state();
+  expect(wd.wind_down.on && wd.lamp.winding_down && sim.lamp > 0, `${label}: go winddown didn't light the lamp`);
+  sim.command("winddown off");
+  expect(sim.lamp === 0, `${label}: winddown off left the lamp on`);
   sim.command("go night");
   sim.step(0, 0, false);
   expect(sim.state().night === true, `${label}: go night isn't night`);
@@ -137,7 +143,7 @@ for (const [w, h] of [[616, 284], [600, 450], [320, 240]]) {
   // Random touches, holds, drags, commands and time jumps
   let seed = 12345 + w, down = false, x = 0, y = 0, hold = 0;
   const rnd = () => (seed = (seed * 1103515245 + 12345) >>> 0) / 4294967296;
-  const cmds = ["lamp toggle", "sound toggle", "go day", "go night", "go alarm", "go sunrise", "button", "state"];
+  const cmds = ["lamp toggle", "sound toggle", "go day", "go night", "go alarm", "go sunrise", "go winddown", "button", "state"];
   try {
     for (let i = 0; i < 6000; i++) {
       if (rnd() < 0.002) sim.clock += rnd() * 86400000;
@@ -158,7 +164,8 @@ for (const [w, h] of [[616, 284], [600, 450], [320, 240]]) {
   const again = boot(w, h, sim.prefs);
   try { again.step(0, 0, false); } catch (err) { fail(`${label}: reboot with saved settings crashed: ${err.message}`); }
   const back = again.state();
-  expect(back.alarm.at === saved.alarm.at && back.lamp.brightness === saved.lamp.brightness && back.sound.kind === saved.sound.kind,
+  expect(back.alarm.at === saved.alarm.at && back.lamp.brightness === saved.lamp.brightness && back.sound.kind === saved.sound.kind &&
+    back.wind_down.on === saved.wind_down.on && back.wake_up.before === saved.wake_up.before,
     `${label}: settings didn't survive a reboot`);
 
   if (failures === before) console.log(`ok ${label}: clock face, settings, commands, sleep sounds, lamp, alarm, 6000 random frames, reboot`);

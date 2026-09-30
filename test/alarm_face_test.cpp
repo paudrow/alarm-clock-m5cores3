@@ -444,6 +444,12 @@ int main() {
     ok.lamp_bright = 0;
     check(!settings_valid(ok), "settings_valid rejects lamp brightness 0");
     ok = default_settings();
+    ok.wake_after = 7;
+    check(!settings_valid(ok), "settings_valid rejects wake minutes not on the list");
+    ok = default_settings();
+    ok.winddown_end_minute = 60;
+    check(!settings_valid(ok), "settings_valid rejects a bad lights-out time");
+    ok = default_settings();
     ok.noise_kind = 3;
     check(!settings_valid(ok), "settings_valid rejects an unknown sound");
   }
@@ -598,8 +604,8 @@ int main() {
     check(step_timer(0, -1) == 0 && step_timer(0, 1) == 15 && step_timer(120, 1) == 120 &&
               step_timer(60, 1) == 90 && step_timer(17, 1) == 30 && step_timer(17, 0) == 15,
           "timer steps");
-    check(step_sunrise(0, 1) == 10 && step_sunrise(60, 1) == 60 && step_sunrise(10, -1) == 0,
-          "sunrise steps");
+    check(step_wake(0, 1) == 10 && step_wake(60, 1) == 60 && step_wake(10, -1) == 0,
+          "wake-up light steps");
     check(adjust_level(30, 5) == 35 && adjust_level(5, -5) == 5 && adjust_level(100, 5) == 100 &&
               adjust_level(33, 5) == 40 && adjust_level(0, 0) == 5,
           "levels step by 5 between 5 and 100");
@@ -607,34 +613,64 @@ int main() {
           "sounds cycle");
   }
   {
-    // Lamp and sunrise
+    // Lamp schedule: wake up
     const Alarm on = {{7, 0}, true, false};
-    check(sunrise_permille(Hm{6, 39}, 59, on, 20) == 0, "dark before the ramp");
-    check(sunrise_permille(Hm{6, 40}, 0, on, 20) == 0, "the ramp starts at 0");
-    check(sunrise_permille(Hm{6, 50}, 0, on, 20) == 500, "half way");
-    check(sunrise_permille(Hm{6, 59}, 59, on, 20) == 999, "almost there");
-    check(sunrise_permille(Hm{7, 0}, 30, on, 20) == 1000, "full through the alarm minute");
-    check(sunrise_permille(Hm{7, 1}, 0, on, 20) == 0, "the ramp is before the alarm only");
-    check(sunrise_permille(Hm{6, 50}, 0, on, 0) == 0, "no sunrise when off");
-    check(sunrise_permille(Hm{6, 50}, 0, Alarm{{7, 0}, false, false}, 20) == 0, "none with the alarm off");
-    check(sunrise_permille(Hm{6, 50}, 0, Alarm{{7, 0}, true, true}, 20) == 0, "none before a skipped alarm");
-    check(sunrise_permille(Hm{23, 55}, 0, Alarm{{0, 10}, true, false}, 20) == 250, "across midnight");
+    check(wake_ramp_permille(Hm{6, 39}, 59, on, 20, 100) == 0, "dark before the ramp");
+    check(wake_ramp_permille(Hm{6, 40}, 0, on, 20, 100) == 0, "the ramp starts at 0");
+    check(wake_ramp_permille(Hm{6, 50}, 0, on, 20, 100) == 500, "half way");
+    check(wake_ramp_permille(Hm{6, 50}, 0, on, 20, 60) == 300, "half way to 60%");
+    check(wake_ramp_permille(Hm{6, 59}, 59, on, 20, 100) == 999, "almost there");
+    check(wake_ramp_permille(Hm{7, 0}, 30, on, 20, 80) == 800, "at its brightness through the alarm minute");
+    check(wake_ramp_permille(Hm{7, 1}, 0, on, 20, 100) == 0, "the ramp is before the alarm only");
+    check(wake_ramp_permille(Hm{6, 50}, 0, on, 0, 100) == 0, "no ramp with 0 minutes before");
+    check(wake_ramp_permille(Hm{6, 50}, 0, Alarm{{7, 0}, false, false}, 20, 100) == 0, "none with the alarm off");
+    check(wake_ramp_permille(Hm{6, 50}, 0, Alarm{{7, 0}, true, true}, 20, 100) == 0, "none before a skipped alarm");
+    check(wake_ramp_permille(Hm{23, 55}, 0, Alarm{{0, 10}, true, false}, 20, 100) == 250, "across midnight");
     int last = -1;
     bool rising = true;
     for (int s = 0; s < 20 * 60; ++s) {
-      const int v = sunrise_permille(step_minutes(Hm{6, 40}, s / 60), s % 60, on, 20);
+      const int v = wake_ramp_permille(step_minutes(Hm{6, 40}, s / 60), s % 60, on, 20, 100);
       rising = rising && v >= last && v <= 1000;
       last = v;
     }
-    check(rising, "the sunrise only brightens");
-    check(!wake_light_expired(Hm{7, 29}, Hm{7, 0}) && wake_light_expired(Hm{7, 30}, Hm{7, 0}),
-          "wake light lasts 30 minutes");
-    check(wake_light_expired(Hm{6, 0}, Hm{7, 0}), "a clock set back ends the wake light");
-    check(lamp_permille(false, 40, 0, false) == 0, "off");
-    check(lamp_permille(true, 40, 0, false) == 400, "on at 40%");
-    check(lamp_permille(true, 40, 700, false) == 700, "sunrise above the lamp's level wins");
-    check(lamp_permille(false, 40, 0, true) == 1000, "wake light is full");
-    check(lamp_permille(true, 250, 0, false) == 1000, "clamped");
+    check(rising, "the wake-up light only brightens");
+    check(!wake_light_expired(Hm{7, 19}, Hm{7, 0}, 20) && wake_light_expired(Hm{7, 20}, Hm{7, 0}, 20),
+          "the light stays on for the minutes after the alarm");
+    check(wake_light_expired(Hm{7, 0}, Hm{7, 0}, 0), "none after with 0 minutes");
+    check(wake_light_expired(Hm{6, 0}, Hm{7, 0}, 30), "a clock set back ends it");
+
+    // Lamp schedule: wind down, 21:30 to lights out at 22:30 at 40%
+    const Hm ws = {21, 30}, we = {22, 30};
+    check(winddown_permille(Hm{21, 29}, 59, ws, we, 40) == 0, "off before wind down");
+    check(winddown_permille(Hm{21, 30}, 0, ws, we, 40) == 400, "on at its brightness from the start");
+    check(winddown_permille(Hm{22, 14}, 59, ws, we, 40) == 400, "steady until the last 15 minutes");
+    check(winddown_permille(Hm{22, 22}, 30, ws, we, 40) == 200, "halfway through the fade");
+    check(winddown_permille(Hm{22, 29}, 30, ws, we, 40) == 13, "a glimmer 30 s before lights out");
+    check(winddown_permille(Hm{22, 30}, 0, ws, we, 40) == 0, "off at lights out");
+    check(winddown_permille(Hm{3, 0}, 0, ws, we, 40) == 0, "off overnight");
+    check(winddown_permille(Hm{0, 10}, 0, Hm{23, 30}, Hm{0, 30}, 50) == 500, "across midnight");
+    check(winddown_permille(Hm{0, 25}, 0, Hm{23, 30}, Hm{0, 30}, 50) > 0 &&
+              winddown_permille(Hm{0, 25}, 0, Hm{23, 30}, Hm{0, 30}, 50) < 500,
+          "fading across midnight");
+    check(winddown_permille(Hm{21, 35}, 0, ws, ws, 40) == 0, "nothing when start and lights out match");
+    check(winddown_permille(Hm{21, 34}, 0, Hm{21, 30}, Hm{21, 40}, 40) == 400 &&
+              winddown_permille(Hm{21, 37}, 30, Hm{21, 30}, Hm{21, 40}, 40) == 200,
+          "a short window fades over its second half");
+    bool falling = true;
+    last = 1001;
+    for (int s = 0; s < 60 * 60; ++s) {
+      const int v = winddown_permille(step_minutes(ws, s / 60), s % 60, ws, we, 40);
+      falling = falling && v <= last;
+      last = v;
+    }
+    check(falling, "wind down only dims");
+
+    check(lamp_permille(false, 40, 0, 0) == 0, "off");
+    check(lamp_permille(true, 40, 0, 0) == 400, "on at 40%");
+    check(lamp_permille(true, 40, 700, 0) == 700, "a brighter schedule wins");
+    check(lamp_permille(true, 40, 200, 0) == 400, "a dimmer schedule doesn't dim the switch");
+    check(lamp_permille(false, 40, 0, 1000) == 1000, "the after-alarm light");
+    check(lamp_permille(true, 250, 0, 0) == 1000, "clamped");
     check(lamp_duty(0) == 0 && lamp_duty(1) == 1 && lamp_duty(1000) == 255 && lamp_duty(-5) == 0 &&
               lamp_duty(2000) == 255,
           "lamp duty ends");
@@ -695,6 +731,20 @@ int main() {
         {"button", CmdKind::Button, 0, 0, 0},
         {"button twice", CmdKind::Unknown, 0, 0, 0},
         {"reboot", CmdKind::Unknown, 0, 0, 0},
+        {"go winddown", CmdKind::GoWindDown, 0, 0, 0},
+        {"winddown on", CmdKind::WindDownOn, 0, 0, 0},
+        {"winddown off", CmdKind::WindDownOff, 0, 0, 0},
+        {"winddown 21:30 22:45", CmdKind::WindDownAt, 21 * 60 + 30, 22 * 60 + 45, 0},
+        {"winddown 9:05 0:30", CmdKind::WindDownAt, 9 * 60 + 5, 30, 0},
+        {"winddown 21:30", CmdKind::Unknown, 0, 0, 0},
+        {"winddown 24:00 01:00", CmdKind::Unknown, 0, 0, 0},
+        {"winddown 21:60 22:00", CmdKind::Unknown, 0, 0, 0},
+        {"wake on", CmdKind::WakeOn, 0, 0, 0},
+        {"wake off", CmdKind::WakeOff, 0, 0, 0},
+        {"wake 30 20", CmdKind::WakeTimes, 30, 20, 0},
+        {"wake 0 45", CmdKind::WakeTimes, 0, 45, 0},
+        {"wake 25 20", CmdKind::Unknown, 0, 0, 0},
+        {"wake 30", CmdKind::Unknown, 0, 0, 0},
     };
     for (const Case& c : cases) {
       const Command got = parse_command(c.line);
@@ -764,6 +814,26 @@ int main() {
     v1.alarm_hour = 6;
     v1.version = 7;
     check(!load_settings(&v1, sizeof(v1), &out), "an unknown version is rejected");
+    SettingsV2 v2;
+    std::memset(&v2, 0, sizeof(v2));
+    Settings base = default_settings();
+    base.alarm_hour = 5;
+    base.lamp_bright = 65;
+    std::memcpy(&v2, &base, sizeof(v2));  // the first 29 bytes are the same
+    v2.version = 2;
+    v2.sunrise_minutes = 20;
+    std::memset(v2.reserved, 0, sizeof(v2.reserved));
+    check(load_settings(&v2, sizeof(v2), &out), "upgrades version 2");
+    check(out.alarm_hour == 5 && out.lamp_bright == 65 && out.noise_kind == base.noise_kind,
+          "version 2 values carried over");
+    check(out.wake_on == 1 && out.wake_before == 20 && out.wake_after == 30 && out.wake_bright == 100,
+          "version 2's sunrise becomes the wake-up light");
+    check(out.winddown_on == 0, "wind down starts off");
+    v2.sunrise_minutes = 0;
+    check(load_settings(&v2, sizeof(v2), &out) && out.wake_on == 0 && out.wake_before == 30,
+          "no sunrise, no wake-up light");
+    v2.sunrise_minutes = 17;
+    check(!load_settings(&v2, sizeof(v2), &out), "a bad version 2 blob is rejected");
     const Alarm a = alarm_of(default_settings());
     check(a.at.hour == 7 && a.at.minute == 0 && !a.enabled && !a.skip_next, "alarm_of defaults");
   }

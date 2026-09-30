@@ -3,7 +3,7 @@
 
 // Everything the clock decides, with no hardware: the alarm's state machine,
 // time formatting, the screen layout and what a touch hits, the sleep-sound
-// generator, the lamp and sunrise, serial commands, and the saved settings.
+// generator, the lamp and its schedule, serial commands, and the saved settings.
 // src/main.cpp draws and drives the hardware from these; the tests in test/
 // check them on a PC.
 
@@ -764,6 +764,8 @@ enum class Screen : uint8_t {
   DayScreen,
   NightScreen,
   NightHours,
+  WindDown,
+  WakeUp,
 };
 
 constexpr int kMenuItems = 6;
@@ -795,6 +797,10 @@ inline const char* screen_title(Screen s) {
       return "Night screen";
     case Screen::NightHours:
       return "Night hours";
+    case Screen::WindDown:
+      return "Wind down";
+    case Screen::WakeUp:
+      return "Wake up";
   }
   return "";
 }
@@ -820,6 +826,10 @@ inline const char* screen_key(Screen s) {
       return "night_screen";
     case Screen::NightHours:
       return "night_hours";
+    case Screen::WindDown:
+      return "wind_down";
+    case Screen::WakeUp:
+      return "wake_up";
   }
   return "";
 }
@@ -832,6 +842,9 @@ inline Screen parent_screen(Screen s) {
       return Screen::Clock;
     case Screen::NightHours:
       return Screen::NightScreen;
+    case Screen::WindDown:
+    case Screen::WakeUp:
+      return Screen::Lamp;
     default:
       return Screen::Settings;
   }
@@ -863,7 +876,20 @@ inline int page_rows(Screen s, RowKind* kinds) {
     case Screen::Lamp:
       add(RowKind::Toggle);   // Lamp on/off
       add(RowKind::Stepper);  // Brightness
-      add(RowKind::Stepper);  // Sunrise
+      add(RowKind::Link);     // Wind down >
+      add(RowKind::Link);     // Wake up >
+      break;
+    case Screen::WindDown:
+      add(RowKind::Toggle);   // Wind down on/off
+      add(RowKind::Stepper);  // Starts
+      add(RowKind::Stepper);  // Lights out
+      add(RowKind::Stepper);  // Brightness
+      break;
+    case Screen::WakeUp:
+      add(RowKind::Toggle);   // Wake-up light on/off
+      add(RowKind::Stepper);  // Before the alarm
+      add(RowKind::Stepper);  // After the alarm
+      add(RowKind::Stepper);  // Brightness
       break;
     case Screen::DayScreen:
       add(RowKind::Stepper);  // Brightness
@@ -1078,15 +1104,16 @@ inline bool in_steps(const int* steps, int n, int value) {
 
 constexpr int kTimerSteps[] = {0, 15, 30, 45, 60, 90, 120};
 constexpr int kTimerStepCount = 7;
-constexpr int kSunriseSteps[] = {0, 10, 15, 20, 30, 45, 60};
-constexpr int kSunriseStepCount = 7;
+// Minutes of wake-up light before and after the alarm.
+constexpr int kWakeSteps[] = {0, 10, 15, 20, 30, 45, 60};
+constexpr int kWakeStepCount = 7;
 
 inline int step_timer(int minutes, int dir) {
   return step_through(kTimerSteps, kTimerStepCount, minutes, dir);
 }
 
-inline int step_sunrise(int minutes, int dir) {
-  return step_through(kSunriseSteps, kSunriseStepCount, minutes, dir);
+inline int step_wake(int minutes, int dir) {
+  return step_through(kWakeSteps, kWakeStepCount, minutes, dir);
 }
 
 // 5..100 in steps of 5, for the lamp and sleep-sound levels.
@@ -1096,42 +1123,71 @@ inline int adjust_level(int value, int delta) {
 }
 
 // ---------------------------------------------------------------------------
-// Lamp and sunrise
+// Lamp schedule: wind down in the evening, wake up around the alarm
 
-// How far through the sunrise we are, permille: it ramps from 0 to 1000 over
-// `ramp_minutes` before the alarm and holds 1000 through the alarm's minute.
-inline int sunrise_permille(Hm now, int second, Alarm alarm, int ramp_minutes) {
-  if (!alarm.enabled || alarm.skip_next || ramp_minutes <= 0) {
+// Wake up: the lamp brightens from off to `bright_percent` over `before`
+// minutes before the alarm, and is full through the alarm's minute. Nothing
+// when the alarm is off or skipped. Permille.
+inline int wake_ramp_permille(Hm now, int second, Alarm alarm, int before,
+                              int bright_percent) {
+  if (!alarm.enabled || alarm.skip_next || before <= 0) {
     return 0;
   }
+  const int full = clamp_int(bright_percent, 0, 100) * 10;
   if (hm_equal(now, alarm.at)) {
-    return 1000;
+    return full;
   }
-  const int ramp_s = ramp_minutes * 60;
+  const int ramp_s = before * 60;
   const int until_s = minutes_until(now, alarm.at) * 60 - clamp_int(second, 0, 59);
   if (until_s <= 0 || until_s > ramp_s) {
     return 0;
   }
-  return (ramp_s - until_s) * 1000 / ramp_s;
+  return (ramp_s - until_s) * full / ramp_s;
 }
 
-constexpr int kWakeLightMinutes = 30;
-
-// After a sunrise alarm rings the lamp stays up, until this many minutes past
-// the alarm or until someone turns it off.
-inline bool wake_light_expired(Hm now, Hm alarm_at) {
-  return minutes_until(alarm_at, now) >= kWakeLightMinutes;
+// After the alarm rings the lamp stays on until `after` minutes past the
+// alarm time (or until someone turns it off).
+inline bool wake_light_expired(Hm now, Hm alarm_at, int after) {
+  return minutes_until(alarm_at, now) >= after;
 }
 
-// The lamp's level, permille of full, from everything that can light it.
-inline int lamp_permille(bool manual_on, int bright_percent, int sunrise,
-                         bool wake_light) {
-  int level = manual_on ? clamp_int(bright_percent, 0, 100) * 10 : 0;
-  if (sunrise > level) {
-    level = sunrise;
+constexpr int kWindDownFadeMinutes = 15;
+
+// Wind down: on at `bright_percent` from `start`, fading out over the last
+// 15 minutes (or half the window, if shorter) to off at `lights_out`. The
+// window may cross midnight. Permille.
+inline int winddown_permille(Hm now, int second, Hm start, Hm lights_out,
+                             int bright_percent) {
+  const int span = minutes_until(start, lights_out);
+  if (span == 0) {
+    return 0;
   }
-  if (wake_light) {
-    level = 1000;
+  const int into = minutes_until(start, now);
+  if (into >= span) {
+    return 0;
+  }
+  const int left_s = (span - into) * 60 - clamp_int(second, 0, 59);
+  int fade_s = kWindDownFadeMinutes * 60;
+  if (fade_s > span * 30) {
+    fade_s = span * 30;
+  }
+  const int full = clamp_int(bright_percent, 0, 100) * 10;
+  if (left_s >= fade_s) {
+    return full;
+  }
+  return left_s <= 0 ? 0 : full * left_s / fade_s;
+}
+
+// The lamp's level, permille of full: the brightest of the switch, the
+// schedule and the after-alarm light.
+inline int lamp_permille(bool manual_on, int bright_percent, int scheduled,
+                         int wake_hold) {
+  int level = manual_on ? clamp_int(bright_percent, 0, 100) * 10 : 0;
+  if (scheduled > level) {
+    level = scheduled;
+  }
+  if (wake_hold > level) {
+    level = wake_hold;
   }
   return clamp_int(level, 0, 1000);
 }
@@ -1164,7 +1220,8 @@ inline ButtonAction button_action(bool ringing, bool lamp_lit) {
 // simulator, so tests and the 3D viewer drive the real firmware code path.
 //   lamp on|off|toggle|<1-100>     sound on|off|toggle|white|pink|brown
 //   time HH:MM[:SS]                alarm HH:MM | on | off
-//   go day|night|alarm|sunrise     button     state     help
+//   winddown on|off|HH:MM HH:MM    wake on|off|<before> <after>  (minutes)
+//   go day|night|alarm|sunrise|winddown          button     state     help
 
 enum class CmdKind : uint8_t {
   None,
@@ -1187,6 +1244,13 @@ enum class CmdKind : uint8_t {
   GoNight,
   GoAlarm,
   GoSunrise,
+  GoWindDown,
+  WindDownOn,
+  WindDownOff,
+  WindDownAt,
+  WakeOn,
+  WakeOff,
+  WakeTimes,
   Button,
 };
 
@@ -1344,6 +1408,48 @@ inline Command parse_command(const char* line) {
       c.kind = CmdKind::GoAlarm;
     } else if (q = p, cmd_word(q, "sunrise") && cmd_end(q)) {
       c.kind = CmdKind::GoSunrise;
+    } else if (q = p, cmd_word(q, "winddown") && cmd_end(q)) {
+      c.kind = CmdKind::GoWindDown;
+    }
+  } else if (p = line, cmd_word(p, "winddown")) {
+    const char* q = p;
+    if (cmd_word(q, "on") && cmd_end(q)) {
+      c.kind = CmdKind::WindDownOn;
+    } else if (q = p, cmd_word(q, "off") && cmd_end(q)) {
+      c.kind = CmdKind::WindDownOff;
+    } else {
+      // Two times: HH:MM HH:MM
+      q = p;
+      int h1 = cmd_number(q);
+      if (h1 >= 0 && h1 <= 23 && *q == ':' && q[1] >= '0' && q[1] <= '9' &&
+          q[2] >= '0' && q[2] <= '9' && q[3] == ' ') {
+        const int m1 = (q[1] - '0') * 10 + (q[2] - '0');
+        q += 3;
+        int h2, m2, s2;
+        if (m1 <= 59 && cmd_clock(q, &h2, &m2, &s2, false)) {
+          c.kind = CmdKind::WindDownAt;
+          c.a = h1 * 60 + m1;
+          c.b = h2 * 60 + m2;
+        }
+      }
+    }
+  } else if (p = line, cmd_word(p, "wake")) {
+    const char* q = p;
+    if (cmd_word(q, "on") && cmd_end(q)) {
+      c.kind = CmdKind::WakeOn;
+    } else if (q = p, cmd_word(q, "off") && cmd_end(q)) {
+      c.kind = CmdKind::WakeOff;
+    } else {
+      q = p;
+      const int before = cmd_number(q);
+      const int after = cmd_number(q);
+      if (before >= 0 && after >= 0 && cmd_end(q) &&
+          in_steps(kWakeSteps, kWakeStepCount, before) &&
+          in_steps(kWakeSteps, kWakeStepCount, after)) {
+        c.kind = CmdKind::WakeTimes;
+        c.a = before;
+        c.b = after;
+      }
     }
   }
   return c;
@@ -1425,7 +1531,7 @@ inline bool rtc_needs_set(int year) { return year < 2026; }
 // Saved settings: one blob in NVS, checked before it's trusted
 
 constexpr uint32_t kSettingsMagic = 0x41434B31u;
-constexpr uint16_t kSettingsVersion = 2;
+constexpr uint16_t kSettingsVersion = 3;
 
 // Version 1, as written by earlier firmware; read once and upgraded.
 struct SettingsV1 {
@@ -1448,6 +1554,20 @@ struct SettingsV1 {
   uint8_t day_bright;
   uint8_t night_bright;
   uint8_t hour12;
+};
+
+// Version 2: the first lamp settings, with a fixed-length wake light.
+struct SettingsV2 {
+  uint32_t magic;
+  uint16_t version;
+  uint8_t v1_fields[17];
+  uint8_t noise_kind;
+  uint8_t noise_volume;
+  uint8_t noise_timer;
+  uint8_t lamp_on;
+  uint8_t lamp_bright;
+  uint8_t sunrise_minutes;
+  uint8_t reserved[3];
 };
 
 struct Settings {
@@ -1476,12 +1596,23 @@ struct Settings {
   uint8_t noise_timer;
   uint8_t lamp_on;
   uint8_t lamp_bright;
-  uint8_t sunrise_minutes;
-  uint8_t reserved[3];
+  uint8_t wake_before;  // "sunrise_minutes" in version 2
+  // Added in version 3: the lamp schedule
+  uint8_t wake_on;
+  uint8_t wake_after;
+  uint8_t wake_bright;
+  uint8_t winddown_on;
+  uint8_t winddown_start_hour;
+  uint8_t winddown_start_minute;
+  uint8_t winddown_end_hour;
+  uint8_t winddown_end_minute;
+  uint8_t winddown_bright;
+  uint8_t reserved[2];
 };
 
 static_assert(sizeof(SettingsV1) == 24, "version 1 blob is 24 bytes");
-static_assert(sizeof(Settings) == 32, "settings blob stays one small NVS record");
+static_assert(sizeof(SettingsV2) == 32, "version 2 blob is 32 bytes");
+static_assert(sizeof(Settings) == 40, "settings blob stays one small NVS record");
 
 inline Settings default_settings() {
   Settings s;
@@ -1510,7 +1641,16 @@ inline Settings default_settings() {
   s.noise_timer = 30;
   s.lamp_on = 0;
   s.lamp_bright = 40;
-  s.sunrise_minutes = 0;
+  s.wake_on = 0;
+  s.wake_before = 30;
+  s.wake_after = 20;
+  s.wake_bright = 100;
+  s.winddown_on = 0;
+  s.winddown_start_hour = 21;
+  s.winddown_start_minute = 30;
+  s.winddown_end_hour = 22;
+  s.winddown_end_minute = 30;
+  s.winddown_bright = 40;
   return s;
 }
 
@@ -1545,19 +1685,48 @@ inline bool settings_valid(const Settings& s) {
       !in_steps(kTimerSteps, kTimerStepCount, s.noise_timer)) {
     return false;
   }
-  if (s.lamp_on > 1 || s.lamp_bright < 5 || s.lamp_bright > 100 ||
-      !in_steps(kSunriseSteps, kSunriseStepCount, s.sunrise_minutes)) {
+  if (s.lamp_on > 1 || s.lamp_bright < 5 || s.lamp_bright > 100) {
+    return false;
+  }
+  if (s.wake_on > 1 || !in_steps(kWakeSteps, kWakeStepCount, s.wake_before) ||
+      !in_steps(kWakeSteps, kWakeStepCount, s.wake_after) || s.wake_bright < 5 ||
+      s.wake_bright > 100) {
+    return false;
+  }
+  if (s.winddown_on > 1 || s.winddown_start_hour > 23 ||
+      s.winddown_start_minute > 59 || s.winddown_end_hour > 23 ||
+      s.winddown_end_minute > 59 || s.winddown_bright < 5 ||
+      s.winddown_bright > 100) {
     return false;
   }
   return true;
 }
 
-// Reads a stored blob of `n` bytes: the current version, or version 1
+// Reads a stored blob of `n` bytes: the current version, or an older one
 // upgraded with defaults for what it didn't have.
 inline bool load_settings(const void* data, size_t n, Settings* out) {
   if (n == sizeof(Settings)) {
     Settings s;
     std::memcpy(&s, data, sizeof(s));
+    if (!settings_valid(s)) {
+      return false;
+    }
+    *out = s;
+    return true;
+  }
+  if (n == sizeof(SettingsV2)) {
+    SettingsV2 old;
+    std::memcpy(&old, data, sizeof(old));
+    if (old.magic != kSettingsMagic || old.version != 2) {
+      return false;
+    }
+    Settings s = default_settings();
+    // Everything up to the sunrise setting lines up field for field.
+    std::memcpy(&s.alarm_hour, old.v1_fields, 17 + 6);
+    // Version 2's sunrise becomes the wake-up light, with its old 30-minute hold.
+    s.wake_on = old.sunrise_minutes > 0 ? 1 : 0;
+    s.wake_before = old.sunrise_minutes > 0 ? old.sunrise_minutes : 30;
+    s.wake_after = 30;
     if (!settings_valid(s)) {
       return false;
     }

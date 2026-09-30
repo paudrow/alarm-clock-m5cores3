@@ -66,6 +66,12 @@ void open(Screen s) {
     const int n = page_rows(Screen::NightScreen, kinds);
     center_tap(row_box(u, 2, n));
   }
+  if (s == Screen::WindDown || s == Screen::WakeUp) {
+    open(Screen::Lamp);
+    RowKind kinds[kMaxRows];
+    const int n = page_rows(Screen::Lamp, kinds);
+    center_tap(row_box(u, s == Screen::WindDown ? 2 : 3, n));
+  }
 }
 
 Box part(Screen s, int row, Part p) {
@@ -101,7 +107,7 @@ void boots_to_a_clock_face_at_every_size() {
 void every_page_and_control_at_every_size() {
   const Screen pages[] = {Screen::Alarm,     Screen::AlarmSound,  Screen::SleepSounds,
                           Screen::Lamp,      Screen::DayScreen,   Screen::NightScreen,
-                          Screen::NightHours};
+                          Screen::NightHours, Screen::WindDown, Screen::WakeUp};
   for (auto wh : sizes()) {
     current = "pages " + std::to_string(wh.first) + "x" + std::to_string(wh.second);
     fresh(wh.first, wh.second);
@@ -175,7 +181,8 @@ void text_fits() {
     no_cuts("settings");
     host::command("sound off");
     const Screen pages[] = {Screen::Alarm, Screen::AlarmSound, Screen::SleepSounds, Screen::Lamp,
-                            Screen::DayScreen, Screen::NightScreen, Screen::NightHours};
+                            Screen::DayScreen, Screen::NightScreen, Screen::NightHours,
+                            Screen::WindDown, Screen::WakeUp};
     for (Screen s : pages) {
       open(s);
       host::frames(2);
@@ -394,7 +401,7 @@ void review_regressions() {
   center_tap(clock_icon_box(ui(), ClockHit::Gear));
   check(screen() == "clock", "the gear does nothing while ringing");
 
-  current = "dismissed sunrise stays dark";
+  current = "dismissed wake-up light stays dark";
   fresh(320, 240);
   host::command("alarm 07:00");
   host::command("go sunrise");
@@ -495,18 +502,24 @@ void lamp_icon_button_and_commands() {
   no_bad_draws("lamp");
 }
 
-void sunrise_ramps_the_lamp_before_the_alarm() {
-  current = "sunrise";
+void wake_up_light_ramps_before_and_holds_after_the_alarm() {
+  current = "wake up";
   fresh(320, 240);
   host::command("alarm 07:00");
-  open(Screen::Lamp);
-  for (int i = 0; i < 3; ++i) center_tap(part(Screen::Lamp, 2, Part::Plus));  // 20 min
-  check(host::jget(host::state(), "lamp", "sunrise") == "20", "sunrise 20 min");
-  center_tap(header_back_box(ui()));
-  center_tap(header_back_box(ui()));
+  open(Screen::WakeUp);
+  center_tap(part(Screen::WakeUp, 0, Part::Whole));  // on
+  center_tap(part(Screen::WakeUp, 1, Part::Minus));  // 30 -> 20 before
+  center_tap(part(Screen::WakeUp, 2, Part::Plus));   // 20 -> 30 after
+  center_tap(part(Screen::WakeUp, 3, Part::Minus));  // 100 -> 95%
+  std::string s = host::state();
+  check(host::jget(s, "wake_up", "on") == "true", "switched on: " + s);
+  check(host::jget(s, "wake_up", "before") == "20" && host::jget(s, "wake_up", "after") == "30" &&
+            host::jget(s, "wake_up", "brightness") == "95",
+        "20 min before, 30 after, 95%");
+  for (int i = 0; i < 3 && screen() != "clock"; ++i) center_tap(header_back_box(ui()));
   host::set_clock(6, 39, 0);
   host::frames(2);
-  check(host::lamp_duty() == 0, "dark before the sunrise starts");
+  check(host::lamp_duty() == 0, "dark before the ramp starts");
   int last = 0;
   bool rising = true;
   for (int m = 0; m < 21; ++m) {
@@ -517,36 +530,120 @@ void sunrise_ramps_the_lamp_before_the_alarm() {
   }
   check(rising, "only ever gets brighter");
   check(host::jget(host::state(), "alarm", "state") == "ringing", "alarm rings at 07:00");
-  check(host::lamp_duty() == 255, "full at the alarm");
+  check(host::lamp_duty() == lamp_duty(950), "at 95% at the alarm");
   center_tap(ring_box(ui(), true));
   host::frames(60);
-  check(host::lamp_duty() == 255, "stays on after Stop, as a wake light");
+  check(host::lamp_duty() == lamp_duty(950), "stays on after Stop");
   host::set_clock(7, 29, 0);
   host::frames(3);
-  check(host::lamp_duty() == 255, "still on at 07:29");
+  check(host::lamp_duty() == lamp_duty(950), "still on at 07:29");
   host::set_clock(7, 30, 0);
   host::frames(3);
   check(host::lamp_duty() == 0, "off 30 minutes after the alarm");
+
+  current = "wake up needs the alarm";
+  host::command("alarm off");
+  host::set_clock(6, 50, 0);
+  host::frames(3);
+  check(host::lamp_duty() == 0, "no wake-up light with the alarm off");
+  open(Screen::Lamp);
+  check(host::drew("Alarm is off"), "the Lamp page says why");
 }
 
-void sunrise_can_be_dismissed_and_skips_with_the_alarm() {
-  current = "sunrise dismiss";
+void wake_up_light_can_be_put_out_and_skips_with_the_alarm() {
+  current = "wake up dismiss";
   fresh(320, 240);
   host::command("alarm 07:00");
   host::command("go sunrise");
   host::frames(60 * 5 * 1000 / 250, 250);
   check(host::lamp_duty() > 0, "go sunrise starts the ramp");
   center_tap(clock_icon_box(ui(), ClockHit::Lamp));
-  check(host::lamp_duty() == 0, "the lamp icon puts the sunrise out");
+  check(host::lamp_duty() == 0, "the lamp icon puts it out");
   host::frames(60 * 1000 / 250, 250);
   check(host::lamp_duty() == 0, "and it stays out");
-  // Next day, skip the alarm: no sunrise either
+  // Next day, skip the alarm: no wake-up light either
   host::command("time 06:40");
   host::frames(2);
   center_tap(clock_icon_box(ui(), ClockHit::Skip));
   host::command("time 06:55");
   host::frames(2);
-  check(host::lamp_duty() == 0, "no sunrise before a skipped alarm");
+  check(host::lamp_duty() == 0, "none before a skipped alarm");
+}
+
+void wind_down_lights_the_evening_and_goes_out() {
+  current = "wind down";
+  fresh(320, 240);
+  open(Screen::WindDown);
+  center_tap(part(Screen::WindDown, 0, Part::Whole));  // on, 21:30-22:30 at 40%
+  center_tap(part(Screen::WindDown, 1, Part::Minus));  // starts 21:15
+  center_tap(part(Screen::WindDown, 2, Part::Plus));   // lights out 22:45
+  center_tap(part(Screen::WindDown, 3, Part::Plus));   // 45%
+  const std::string s = host::state();
+  check(host::jget(s, "wind_down", "on") == "true" && host::jget(s, "wind_down", "start") == "21:15" &&
+            host::jget(s, "wind_down", "end") == "22:45" &&
+            host::jget(s, "wind_down", "brightness") == "45",
+        "set to 21:15-22:45 at 45%: " + s);
+  for (int i = 0; i < 3 && screen() != "clock"; ++i) center_tap(header_back_box(ui()));
+  host::set_clock(21, 14, 50);
+  host::frames(3);
+  check(host::lamp_duty() == 0, "off before it starts");
+  host::frames(20 * 1000 / 250, 250);
+  check(host::lamp_duty() == lamp_duty(450), "on at 45% at 21:15");
+  check(host::drew_prefix("Lights out 22:45"), "the clock says when the light goes out");
+  host::set_clock(22, 30, 0);
+  host::frames(3);
+  const int fading_from = host::lamp_duty();
+  int last = fading_from;
+  bool dimming = true;
+  int midway = -1;
+  for (int m = 0; m < 15; ++m) {
+    host::frames(60000 / 500, 500);
+    dimming = dimming && host::lamp_duty() <= last;
+    last = host::lamp_duty();
+    if (m == 7) midway = last;
+  }
+  check(fading_from == lamp_duty(450) && dimming, "fades over the last 15 minutes");
+  check(midway > 0 && midway < fading_from, "partway down halfway through the fade");
+  check(host::lamp_duty() == 0, "out at 22:45");
+  check(host::jget(host::state(), "lamp", "winding_down") == "false", "and done");
+
+  current = "wind down put out early";
+  host::set_clock(21, 30, 0);  // the next evening
+  st.clock_s += 86400;
+  host::frames(3);
+  check(host::lamp_duty() > 0, "on again the next evening");
+  host::button();
+  check(host::lamp_duty() == 0, "the button puts it out");
+  host::frames(10 * 60 * 1000 / 500, 500);
+  check(host::lamp_duty() == 0, "and it stays out until lights out");
+
+  current = "go winddown";
+  fresh(616, 284);
+  host::command("go winddown");
+  host::frames(3);
+  check(host::lamp_duty() == lamp_duty(400), "go winddown turns it on and starts it");
+  host::command("winddown off");
+  check(host::lamp_duty() == 0, "winddown off");
+  host::command("winddown 20:00 20:30");
+  host::command("time 20:10");
+  host::frames(3);
+  check(host::lamp_duty() == lamp_duty(400), "winddown with times");
+  host::command("wake 45 10");
+  check(host::jget(host::state(), "wake_up", "before") == "45", "wake with minutes");
+}
+
+void schedule_and_switch_together() {
+  current = "switch and schedule";
+  fresh(320, 240);
+  host::command("winddown 21:00 22:00");
+  host::command("lamp 80");
+  host::command("time 21:20");
+  host::frames(3);
+  check(host::lamp_duty() == lamp_duty(800), "the brighter of switch and schedule");
+  center_tap(clock_icon_box(ui(), ClockHit::Lamp));
+  check(host::lamp_duty() == 0, "one tap puts both out");
+  center_tap(clock_icon_box(ui(), ClockHit::Lamp));
+  check(host::lamp_duty() == lamp_duty(800), "another turns the switch back on");
 }
 
 void go_commands_travel_in_time() {
@@ -635,7 +732,36 @@ void version1_settings_are_upgraded() {
   const std::string s = host::state();
   check(host::jget(s, "alarm", "at") == "06:15", "alarm time carried over");
   check(host::jget(s, "sound", "kind") == "pink", "new settings get defaults");
-  check(st.prefs["alarmclk/cfg"].size() == sizeof(Settings), "rewritten as version 2");
+  check(st.prefs["alarmclk/cfg"].size() == sizeof(Settings), "rewritten as the current version");
+}
+
+void version2_settings_are_upgraded() {
+  current = "v2 upgrade";
+  SettingsV2 old;
+  Settings base = default_settings();
+  base.alarm_hour = 6;
+  base.alarm_minute = 20;
+  base.alarm_enabled = 1;
+  base.lamp_bright = 55;
+  std::memcpy(&old, &base, sizeof(old));
+  old.version = 2;
+  old.sunrise_minutes = 15;
+  std::memset(old.reserved, 0, sizeof(old.reserved));
+  st.prefs.clear();
+  const uint8_t* b = reinterpret_cast<const uint8_t*>(&old);
+  st.prefs["alarmclk/cfg"] = std::vector<uint8_t>(b, b + sizeof(old));
+  host::boot(320, 240);
+  host::frames(2);
+  const std::string s = host::state();
+  check(host::jget(s, "alarm", "at") == "06:20" && host::jget(s, "lamp", "brightness") == "55",
+        "version 2 values carried over");
+  check(host::jget(s, "wake_up", "on") == "true" && host::jget(s, "wake_up", "before") == "15" &&
+            host::jget(s, "wake_up", "after") == "30",
+        "its sunrise becomes the wake-up light: " + s);
+  check(st.prefs["alarmclk/cfg"].size() == sizeof(Settings), "rewritten as version 3");
+  host::set_clock(6, 12, 30);
+  host::frames(3);
+  check(host::lamp_duty() > 0, "and it lights before the alarm");
 }
 
 void corrupt_settings_fall_back_to_defaults() {
@@ -680,7 +806,7 @@ void night_look_is_red_and_dim() {
 // jumps; the firmware must never draw off screen or save bad settings.
 void random_abuse() {
   const char* cmds[] = {"lamp toggle", "sound toggle", "go day", "go night", "go alarm",
-                        "go sunrise", "button", "state", "sound pink", "alarm 07:42",
+                        "go sunrise", "button", "state", "go winddown", "alarm 07:42",
                         "time 07:41:55", "lamp 3", "alarm off"};
   for (auto wh : sizes()) {
     current = "random " + std::to_string(wh.first) + "x" + std::to_string(wh.second);
@@ -742,12 +868,15 @@ int main() {
   review_regressions();
   sound_icon_toggles_noise();
   lamp_icon_button_and_commands();
-  sunrise_ramps_the_lamp_before_the_alarm();
-  sunrise_can_be_dismissed_and_skips_with_the_alarm();
+  wake_up_light_ramps_before_and_holds_after_the_alarm();
+  wake_up_light_can_be_put_out_and_skips_with_the_alarm();
+  wind_down_lights_the_evening_and_goes_out();
+  schedule_and_switch_together();
   go_commands_travel_in_time();
   serial_commands_answer();
   settings_survive_a_reboot();
   version1_settings_are_upgraded();
+  version2_settings_are_upgraded();
   corrupt_settings_fall_back_to_defaults();
   night_look_is_red_and_dim();
   random_abuse();

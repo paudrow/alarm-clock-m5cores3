@@ -98,8 +98,9 @@ struct App {
   int noise_buf;
   int noise_volume_applied;
 
-  bool wake_light;
-  bool sunrise_dismissed;
+  bool wake_light;          // holding on after the alarm rang
+  bool schedule_dismissed;  // turned off by hand until the schedule's next change
+  bool winding_down;
   int lamp_level;  // permille
   int lamp_duty_applied;
 
@@ -420,6 +421,38 @@ void night_window_text(char* buf, size_t n) {
 
 bool lamp_lit() { return app.lamp_level > 0; }
 
+Hm winddown_start() {
+  return Hm{app.cfg.winddown_start_hour, app.cfg.winddown_start_minute};
+}
+Hm winddown_end() { return Hm{app.cfg.winddown_end_hour, app.cfg.winddown_end_minute}; }
+
+// "9:30PM-10:30PM" or "Off"
+void winddown_text(char* buf, size_t n) {
+  if (!app.cfg.winddown_on) {
+    std::snprintf(buf, n, "Off");
+    return;
+  }
+  char a[12];
+  char b[12];
+  format_hm_short(a, sizeof(a), winddown_start(), hours());
+  format_hm_short(b, sizeof(b), winddown_end(), hours());
+  std::snprintf(buf, n, "%s-%s", a, b);
+}
+
+// "30 min before", "Needs the alarm" or "Off"
+void wake_text(char* buf, size_t n) {
+  const Settings& c = app.cfg;
+  if (!c.wake_on || (c.wake_before == 0 && c.wake_after == 0)) {
+    std::snprintf(buf, n, "Off");
+  } else if (!c.alarm_enabled) {
+    std::snprintf(buf, n, "Alarm is off");
+  } else if (c.wake_before > 0) {
+    std::snprintf(buf, n, "%d min before", c.wake_before);
+  } else {
+    std::snprintf(buf, n, "%d min after", c.wake_after);
+  }
+}
+
 uint32_t noise_elapsed() { return millis() - app.noise_start; }
 
 int page_texts(Screen s, RowText* rows) {
@@ -479,12 +512,30 @@ int page_texts(Screen s, RowText* rows) {
       set_row(&rows[0], "Lamp", "", lamp_lit());
       percent(v, sizeof(v), c.lamp_bright);
       set_row(&rows[1], "Brightness", v, false);
-      if (c.sunrise_minutes == 0) {
-        std::snprintf(v, sizeof(v), "Off");
-      } else {
-        std::snprintf(v, sizeof(v), "%d min", c.sunrise_minutes);
-      }
-      set_row(&rows[2], "Sunrise", v, false);
+      winddown_text(v, sizeof(v));
+      set_row(&rows[2], "Wind down", v, false);
+      wake_text(v, sizeof(v));
+      set_row(&rows[3], "Wake up", v, false);
+      break;
+    }
+    case Screen::WindDown: {
+      set_row(&rows[0], "Wind down", "", c.winddown_on != 0);
+      format_hm(v, sizeof(v), winddown_start(), hours());
+      set_row(&rows[1], "Starts", v, false);
+      format_hm(v, sizeof(v), winddown_end(), hours());
+      set_row(&rows[2], "Lights out", v, false);
+      percent(v, sizeof(v), c.winddown_bright);
+      set_row(&rows[3], "Brightness", v, false);
+      break;
+    }
+    case Screen::WakeUp: {
+      set_row(&rows[0], "Wake-up light", "", c.wake_on != 0);
+      std::snprintf(v, sizeof(v), c.wake_before ? "%d min" : "None", c.wake_before);
+      set_row(&rows[1], "Before alarm", v, false);
+      std::snprintf(v, sizeof(v), c.wake_after ? "%d min" : "None", c.wake_after);
+      set_row(&rows[2], "After alarm", v, false);
+      percent(v, sizeof(v), c.wake_bright);
+      set_row(&rows[3], "Brightness", v, false);
       break;
     }
     case Screen::DayScreen:
@@ -568,9 +619,14 @@ void tile_text(Screen s, TileText* t) {
     case Screen::Lamp:
       if (lamp_lit()) {
         std::snprintf(t->sub, sizeof(t->sub), "On, %d%%", (app.lamp_level + 5) / 10);
-      } else if (c.sunrise_minutes > 0) {
-        std::snprintf(t->sub, sizeof(t->sub), "Off, sunrise %d min",
-                      c.sunrise_minutes);
+      } else if (c.winddown_on && c.wake_on) {
+        std::snprintf(t->sub, sizeof(t->sub), "Wind down, wake up");
+      } else if (c.winddown_on) {
+        char a[12];
+        format_hm_short(a, sizeof(a), winddown_start(), hours());
+        std::snprintf(t->sub, sizeof(t->sub), "Wind down %s", a);
+      } else if (c.wake_on) {
+        std::snprintf(t->sub, sizeof(t->sub), "Wake-up light");
       } else {
         std::snprintf(t->sub, sizeof(t->sub), "Off");
       }
@@ -586,6 +642,8 @@ void tile_text(Screen s, TileText* t) {
     case Screen::Clock:
     case Screen::Settings:
     case Screen::NightHours:
+    case Screen::WindDown:
+    case Screen::WakeUp:
       break;
   }
 }
@@ -759,6 +817,11 @@ void clock_view(const m5::rtc_datetime_t& dt, ClockView* v) {
               hours());
     std::snprintf(alarm_part, sizeof(alarm_part), v->skip ? "Skipping %s" : "Alarm %s",
                   when);
+  }
+  if (app.winding_down) {
+    // At bedtime, when the light goes out matters more than the alarm.
+    format_hm(when, sizeof(when), winddown_end(), hours());
+    std::snprintf(alarm_part, sizeof(alarm_part), "Lights out %s", when);
   }
   char sound_part[40] = "";
   if (app.noise_on) {
@@ -982,7 +1045,7 @@ void pump_noise() {
 void lamp_off() {
   app.cfg.lamp_on = 0;
   app.wake_light = false;
-  app.sunrise_dismissed = true;
+  app.schedule_dismissed = true;
 }
 
 void lamp_toggle() {
@@ -995,19 +1058,31 @@ void lamp_toggle() {
 
 void update_lamp(const m5::rtc_datetime_t& dt) {
   const Hm now = {dt.time.hours, dt.time.minutes};
-  const Alarm alarm = alarm_of(app.cfg);
-  int sunrise = sunrise_permille(now, dt.time.seconds, alarm, app.cfg.sunrise_minutes);
-  if (sunrise == 0) {
-    app.sunrise_dismissed = false;
+  const Settings& c = app.cfg;
+  const Alarm alarm = alarm_of(c);
+  int wake = c.wake_on ? wake_ramp_permille(now, dt.time.seconds, alarm,
+                                            c.wake_before, c.wake_bright)
+                       : 0;
+  if (app.occurrence == Occurrence::Skipped) {
+    wake = 0;
   }
-  if (app.sunrise_dismissed || app.occurrence == Occurrence::Skipped) {
-    sunrise = 0;
+  const int wind = c.winddown_on ? winddown_permille(now, dt.time.seconds,
+                                                     winddown_start(), winddown_end(),
+                                                     c.winddown_bright)
+                                 : 0;
+  int scheduled = wake > wind ? wake : wind;
+  if (scheduled == 0) {
+    app.schedule_dismissed = false;  // turning it off lasts until the schedule next starts
   }
-  if (app.wake_light && wake_light_expired(now, alarm.at)) {
+  if (app.schedule_dismissed) {
+    scheduled = 0;
+  }
+  app.winding_down = wind > 0 && !app.schedule_dismissed;
+  if (app.wake_light && (!c.wake_on || wake_light_expired(now, alarm.at, c.wake_after))) {
     app.wake_light = false;
   }
-  app.lamp_level = lamp_permille(app.cfg.lamp_on != 0, app.cfg.lamp_bright,
-                                 sunrise, app.wake_light);
+  app.lamp_level = lamp_permille(c.lamp_on != 0, c.lamp_bright, scheduled,
+                                 app.wake_light ? c.wake_bright * 10 : 0);
   const int duty = lamp_duty(app.lamp_level);
   if (duty != app.lamp_duty_applied) {
     analogWrite(kLampPin, duty);
@@ -1096,7 +1171,32 @@ void on_row(Screen s, int row, Part part, Intensity* preview) {
       } else if (row == 1) {
         c.lamp_bright = static_cast<uint8_t>(adjust_level(c.lamp_bright, 5 * dir));
       } else if (row == 2) {
-        c.sunrise_minutes = static_cast<uint8_t>(step_sunrise(c.sunrise_minutes, dir));
+        go(Screen::WindDown);
+      } else if (row == 3) {
+        go(Screen::WakeUp);
+      }
+      break;
+    case Screen::WindDown:
+      if (row == 0) {
+        c.winddown_on = c.winddown_on ? 0 : 1;
+      } else if (row == 1 || row == 2) {
+        const Hm t = step_minutes(row == 1 ? winddown_start() : winddown_end(), 15 * dir);
+        (row == 1 ? c.winddown_start_hour : c.winddown_end_hour) = static_cast<uint8_t>(t.hour);
+        (row == 1 ? c.winddown_start_minute : c.winddown_end_minute) =
+            static_cast<uint8_t>(t.minute);
+      } else if (row == 3) {
+        c.winddown_bright = static_cast<uint8_t>(adjust_level(c.winddown_bright, 5 * dir));
+      }
+      break;
+    case Screen::WakeUp:
+      if (row == 0) {
+        c.wake_on = c.wake_on ? 0 : 1;
+      } else if (row == 1) {
+        c.wake_before = static_cast<uint8_t>(step_wake(c.wake_before, dir));
+      } else if (row == 2) {
+        c.wake_after = static_cast<uint8_t>(step_wake(c.wake_after, dir));
+      } else if (row == 3) {
+        c.wake_bright = static_cast<uint8_t>(adjust_level(c.wake_bright, 5 * dir));
       }
       break;
     case Screen::DayScreen:
@@ -1259,7 +1359,10 @@ int write_state_json(char* out, size_t n) {
       "\"alarm\":{\"at\":\"%02d:%02d\",\"enabled\":%s,\"skip_next\":%s,"
       "\"state\":\"%s\",\"snooze\":%s},"
       "\"lamp\":{\"on\":%s,\"brightness\":%d,\"level\":%d,\"duty\":%d,"
-      "\"sunrise\":%d,\"wake\":%s},"
+      "\"winding_down\":%s,\"wake_hold\":%s},"
+      "\"wind_down\":{\"on\":%s,\"start\":\"%02d:%02d\",\"end\":\"%02d:%02d\","
+      "\"brightness\":%d},"
+      "\"wake_up\":{\"on\":%s,\"before\":%d,\"after\":%d,\"brightness\":%d},"
       "\"sound\":{\"playing\":%s,\"kind\":\"%s\",\"volume\":%d,\"timer\":%d,"
       "\"minutes_left\":%d},"
       "\"night_hours\":{\"mode\":\"%s\",\"start\":\"%02d:%02d\",\"end\":\"%02d:%02d\"}}",
@@ -1269,7 +1372,10 @@ int write_state_json(char* out, size_t n) {
       c.skip_next ? "true" : "false", occurrence_name(app.occurrence), snooze,
       c.lamp_on ? "true" : "false", c.lamp_bright,
       app.lamp_level < 0 ? 0 : app.lamp_level, app.lamp_duty_applied < 0 ? 0 : app.lamp_duty_applied,
-      c.sunrise_minutes, app.wake_light ? "true" : "false",
+      app.winding_down ? "true" : "false", app.wake_light ? "true" : "false",
+      c.winddown_on ? "true" : "false", c.winddown_start_hour, c.winddown_start_minute,
+      c.winddown_end_hour, c.winddown_end_minute, c.winddown_bright,
+      c.wake_on ? "true" : "false", c.wake_before, c.wake_after, c.wake_bright,
       app.noise_on ? "true" : "false",
       noise_key(static_cast<NoiseKind>(c.noise_kind)), c.noise_volume,
       c.noise_timer,
@@ -1293,7 +1399,8 @@ void run_command(const Command& c) {
     case CmdKind::Help:
       Serial.printf(
           "lamp on|off|toggle|1-100  sound on|off|toggle|white|pink|brown  "
-          "time HH:MM[:SS]  alarm HH:MM|on|off  go day|night|alarm|sunrise  "
+          "time HH:MM[:SS]  alarm HH:MM|on|off  winddown on|off|HH:MM HH:MM  "
+          "wake on|off|<before> <after>  go day|night|alarm|sunrise|winddown  "
           "button  state\n");
       return;
     case CmdKind::State: {
@@ -1369,13 +1476,43 @@ void run_command(const Command& c) {
     case CmdKind::GoSunrise: {
       s.alarm_enabled = 1;
       s.skip_next = 0;
-      if (s.sunrise_minutes == 0) {
-        s.sunrise_minutes = 10;
+      s.wake_on = 1;
+      if (s.wake_before == 0) {
+        s.wake_before = 10;
       }
-      const Hm t = step_minutes(Hm{s.alarm_hour, s.alarm_minute}, -s.sunrise_minutes);
+      const Hm t = step_minutes(Hm{s.alarm_hour, s.alarm_minute}, -s.wake_before);
       set_clock_time(t.hour, t.minute, 0);
       break;
     }
+    case CmdKind::GoWindDown:
+      s.winddown_on = 1;
+      set_clock_time(s.winddown_start_hour, s.winddown_start_minute, 0);
+      break;
+    case CmdKind::WindDownOn:
+      s.winddown_on = 1;
+      break;
+    case CmdKind::WindDownOff:
+      s.winddown_on = 0;
+      break;
+    case CmdKind::WindDownAt:
+      s.winddown_on = 1;
+      s.winddown_start_hour = static_cast<uint8_t>(c.a / 60);
+      s.winddown_start_minute = static_cast<uint8_t>(c.a % 60);
+      s.winddown_end_hour = static_cast<uint8_t>(c.b / 60);
+      s.winddown_end_minute = static_cast<uint8_t>(c.b % 60);
+      break;
+    case CmdKind::WakeOn:
+      s.wake_on = 1;
+      break;
+    case CmdKind::WakeOff:
+      s.wake_on = 0;
+      app.wake_light = false;
+      break;
+    case CmdKind::WakeTimes:
+      s.wake_on = 1;
+      s.wake_before = static_cast<uint8_t>(c.a);
+      s.wake_after = static_cast<uint8_t>(c.b);
+      break;
     case CmdKind::Button:
       do_button();
       if (app.occurrence == Occurrence::Ringing) {
@@ -1478,7 +1615,7 @@ void loop() {
   app.snooze_at = step.snooze_at;
   if (app.occurrence == Occurrence::Ringing && before != Occurrence::Ringing) {
     stop_noise();
-    if (app.cfg.sunrise_minutes > 0 && !app.sunrise_dismissed) {
+    if (app.cfg.wake_on && app.cfg.wake_after > 0 && !app.schedule_dismissed) {
       app.wake_light = true;
     }
     if (app.screen != Screen::Clock) {
